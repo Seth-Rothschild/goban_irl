@@ -12,11 +12,13 @@ def test_transform_image_two_corners():
     """If transform image is called with two corners
     Crop the image to the rectangle defined by the two corners
     """
-    board = Board()
+
     image = "tests/image_samples/find_stones_test_1.png"
     corners = [(888, 248), (2470, 1830)]
+    board = Board(image, corners)
 
-    img = board.transform_image(image, corners)
+    cv2image = cv2.imread(image)
+    img = board.transform_image(cv2image, corners)
     height, width, _ = img.shape
     assert height == corners[1][1] - corners[0][1]
     assert width == corners[1][0] - corners[0][0]
@@ -26,11 +28,13 @@ def test_transform_image_four_corners():
     """If transform image is called with four corners
     Run a perspective transform and resize to a standard board size based on the wider width
     """
-    board = Board()
+
     image = "tests/image_samples/real_board_1.png"
     corners = [(590, 1328), (2232, 1330), (2669, 3059), (100, 3083)]
+    board = Board(image, corners)
 
-    img = board.transform_image(image, corners)
+    cv2image= cv2.imread(image)
+    img = board.transform_image(cv2image, corners)
     height, width, _ = img.shape
     assert width == corners[2][0] - corners[3][0]
     assert height == int((454.5 / 424.2) * width)
