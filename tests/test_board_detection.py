@@ -114,9 +114,8 @@ def test_flip():
         image="tests/image_samples/find_stones_test_1.png", corners=corners, flip=True
     )
 
-    assert board.state[18][0] == "white"
-    assert board.state[0][18] == "black"
-    print(board.state)
+    assert board.state[18][18] == "white"
+    assert board.state[0][0] == "black"
 
 
 def check_stones(board):
@@ -150,3 +149,20 @@ def check_stones(board):
 #         cv2.waitKey(0)
 #         print('----')
 #     assert False
+def test_calibrate():
+
+    corners = [(888, 1830), (2470, 248)]
+
+    board = Board(image="tests/image_samples/find_stones_test_1.png", corners=corners)
+    board.calibrate(black_stones=[(18, 18), (3, 15)], white_stones=[(0, 0), (15, 3)], empty_spaces=[(1, 1), (17, 17), (1, 17), (17, 1)])
+
+    board = Board(image="tests/image_samples/find_stones_test_2.png", corners=corners)
+    board.calibrate(black_stones=[(18, 18), (3, 15)], white_stones=[(0, 0), (15, 3)], empty_spaces=[(1, 1), (17, 17), (1, 17), (17, 1)])
+
+    board = Board(image="tests/image_samples/find_stones_test_3.png", corners=corners)
+    board.calibrate(black_stones=[(18, 18), (3, 15)], white_stones=[(0, 0), (15, 3)], empty_spaces=[(1, 1), (17, 17), (1, 17), (17, 1)])
+
+    corners = [(1105, 548), (2956, 559), (3669, 2305), (455, 2315)]
+    board = Board(image="tests/image_samples/real_board_1.png", corners=corners)
+    board.calibrate(black_stones=[(18, 18), (3, 15)], white_stones=[(0, 0), (15, 3)], empty_spaces=[(1, 1), (17, 17), (1, 17), (17, 1)])
+    

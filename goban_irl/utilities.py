@@ -10,7 +10,8 @@ def find_width_and_height(start, end):
 
     return (width, height)
 
-def crop(image, xmin, xmax, ymin, ymax):
+def crop(image, boundary):
+    xmin, xmax, ymin, ymax = boundary
     """Does opencv crop but takes x arguments before y"""
     return image[int(ymin) : int(ymax), int(xmin) : int(xmax)]
 
