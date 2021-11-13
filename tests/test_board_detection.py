@@ -150,9 +150,7 @@ def check_stones(board):
 #         print('----')
 #     assert False
 def test_calibrate():
-
     corners = [(888, 1830), (2470, 248)]
-
     board = Board(image="tests/image_samples/find_stones_test_1.png", corners=corners)
     board.calibrate(black_stones=[(18, 18), (3, 15)], white_stones=[(0, 0), (15, 3)], empty_spaces=[(1, 1), (17, 17), (1, 17), (17, 1)])
 
@@ -165,4 +163,25 @@ def test_calibrate():
     corners = [(1105, 548), (2956, 559), (3669, 2305), (455, 2315)]
     board = Board(image="tests/image_samples/real_board_1.png", corners=corners)
     board.calibrate(black_stones=[(18, 18), (3, 15)], white_stones=[(0, 0), (15, 3)], empty_spaces=[(1, 1), (17, 17), (1, 17), (17, 1)])
+    
+def test_human_readable():
+    board = Board()
+    loc = (0, 0)
+    assert board._human_readable_numeric(loc) == '1-19'
+    assert board._human_readable_alpha(loc) == 'A19'
+
+    loc = (18, 0)
+    assert board._human_readable_numeric(loc) == '1-1'
+    assert board._human_readable_alpha(loc) == 'A1'
+
+    loc = (0, 18)
+    assert board._human_readable_numeric(loc) == '19-19'
+    assert board._human_readable_alpha(loc) == 'T19'
+
+    loc = (18, 18)
+    assert board._human_readable_numeric(loc) == '19-1'
+    assert board._human_readable_alpha(loc) == 'T1'
+
+
+
     

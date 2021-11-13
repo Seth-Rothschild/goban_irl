@@ -39,3 +39,21 @@ def perspective_transform(image, corners):
 def scale_image(image, target_width, target_height):
     """Does opencv resize to target width and target height"""
     return cv2.resize(image, (target_width, target_height))
+
+def check_bgr_blue(im):
+    return im.mean(axis=0).mean(axis=0)[0]
+
+
+def check_hsv_value(im):
+    return cv2.cvtColor(im, cv2.COLOR_BGR2HSV).mean(axis=0).mean(axis=0)[2]
+
+
+def check_bw(im):
+    return cv2.cvtColor(im, cv2.COLOR_BGR2GRAY).mean(axis=0).mean(axis=0)
+
+
+def check_bgr_and_bw(im):
+    return check_bgr_blue(im) + check_bw(im)
+
+def import_image(path):
+    return cv2.imread(path)

@@ -1,6 +1,4 @@
-import cv2
-import numpy as np
-from goban_irl.utilities import crop, perspective_transform
+import goban_irl.utilities as utils
 
 
 class Board:
@@ -26,16 +24,16 @@ class Board:
         """
         if image is not None:
             if isinstance(image, str):
-                image = cv2.imread(image)
+                image = utils.import_image(image)
 
             self.corners = self._sort_corners(corners)
 
             self.board_subimage = self.transform_image(image, self.corners)
+
             self.find_state_from_image(
                 self.board_subimage,
                 detection_function=detection_function,
                 cutoffs=cutoffs,
-                debug=debug,
             )
 
             if flip:
@@ -43,32 +41,35 @@ class Board:
 
     def transform_image(self, image, corners):
         """Create a rectangular board from an opencv image and corner locations.
+        Given two corners crop the board to the rectangle defined by those corners.
+        Given four corners, run a perspective transform.
 
         Args:
             image (opencv image): An opencv image a go board
-            corners (list[tuple[int, int]]): A list of (x, y) pairs for the corners of the board. Given two corners, crop the image to a rectangle those corners define. Given four corners, do an opencv perspective transform to get a rectangle.
+            corners (list[tuple[int, int]]): A list of (x, y) pairs for the corners of the board.
 
         returns:
-            board_subimage (opencv image): A rectangular image whose corners are the (1, 1) and (19, 19) points on the board.
+            board_subimage (opencv image): A rectangular image whose corners are the 1-1 and 19-19 points on the board.
 
         """
         if len(corners) == 2:
             (xmin, ymin), (xmax, ymax) = self.corners
             boundary = (xmin, xmax, ymin, ymax)
-            board_subimage = crop(image, boundary)
+            board_subimage = utils.crop(image, boundary)
 
         elif len(corners) == 4:
-            board_subimage = perspective_transform(image, corners)
+            board_subimage = utils.perspective_transform(image, corners)
         return board_subimage
 
     def find_state_from_image(
-        self, board_subimage, debug=False, detection_function=None, cutoffs=None
+        self, board_subimage, detection_function=None, cutoffs=None
     ):
         """Create a 19x19 array `state` filled with `empty`, `black` and `white`
 
         Args:
-            board_subimage (opencv image): A rectangular image whose corners are the (1, 1) and (19, 19) points on the board.
-            debug (bool, default False): Enables debug mode which shows detected corners, detected stones.
+            board_subimage (opencv image): A rectangular image whose corners are the 1-1 and 19-19 points on the board.
+            detection_function (function: opencv image -> int): A function to detect stones from an image
+            cutoffs (tuple[int, int]): Boundaries to make decisions for the detection function
 
         returns:
             self.state: A 19x19 array of `empty`, `black`, and `white` corresponding to the image and detection function
@@ -79,29 +80,16 @@ class Board:
             board_subimage, self.intersections
         )
 
-        if debug:
-            img = board_subimage
-            for row in self.intersections:
-                for loc in row:
-                    img = cv2.circle(img, loc, 10, (255, 0, 0))
-
-            self.averages = [[0 for _ in range(19)] for _ in range(19)]
-            cv2.imshow("image", img)
-            cv2.waitKey(0)
-
         self.state = [["empty" for _ in range(19)] for _ in range(19)]
 
         for i, row in enumerate(stone_subimage_boundaries):
             for j, boundary in enumerate(row):
-                stone_subimage = crop(board_subimage, boundary)
-                position_state, average = self.detect_stone(
+                stone_subimage = utils.crop(board_subimage, boundary)
+                position_state, deciding_value = self.detect_stone(
                     stone_subimage,
                     detection_function=detection_function,
                     cutoffs=cutoffs,
                 )
-
-                # if debug:
-                #     self.averages[i][j] = average
 
                 self.state[i][j] = position_state
 
@@ -120,7 +108,7 @@ class Board:
             deciding_value (float): The value used to make the decision
         """
         if detection_function == None:
-            detection_function = check_bgr_blue
+            detection_function = utils.check_bgr_blue
         if cutoffs == None:
             cutoffs = (70, 150)
 
@@ -129,16 +117,19 @@ class Board:
 
         return position_state, deciding_value
 
-    def compare_to(self, board2):
+    def compare_to(self, other_board):
         """Compare this board state with another board
         returns:
             missing_stones (list(tuple(int, int))): Indices where board2 is missing stones of board1
         """
+        board_state = self.state
+
         missing_stones = []
-        for i, row in enumerate(self.state):
-            for j, value in enumerate(row):
-                other_value = board2.state[i][j]
-                if value == "empty" and (
+        for i, row in enumerate(board_state):
+            for j, board_value in enumerate(row):
+                other_board_value = other_board.state[i][j]
+
+                if board_value == "empty" and (
                     other_value == "black" or other_value == "white"
                 ):
                     missing_stones.append((i, j))
@@ -168,19 +159,19 @@ class Board:
         )
 
         black_stone_images = [
-            crop(board_subimage, stone_subimage_boundaries[i][j])
+            utils.crop(board_subimage, stone_subimage_boundaries[i][j])
             for i, j in black_stones
         ]
         white_stone_images = [
-            crop(board_subimage, stone_subimage_boundaries[i][j])
+            utils.crop(board_subimage, stone_subimage_boundaries[i][j])
             for i, j in white_stones
         ]
         empty_space_images = [
-            crop(board_subimage, stone_subimage_boundaries[i][j])
+            utils.crop(board_subimage, stone_subimage_boundaries[i][j])
             for i, j in empty_spaces
         ]
 
-        test_functions = [check_bgr_blue, check_hsv_value, check_bw, check_bgr_and_bw]
+        test_functions = [utils.check_bgr_blue, utils.check_hsv_value, utils.check_bw, utils.check_bgr_and_bw]
         for measurement_function in test_functions:
             b_measurements = [measurement_function(im) for im in black_stone_images]
             e_measurements = [measurement_function(im) for im in empty_space_images]
@@ -210,13 +201,13 @@ class Board:
 
             else:
                 print("{} does not partition".format(measurement_function.__name__))
-            print('{} | {} | {}'.format(max_b, [min_e, max_e], min_w))
+            print("{} | {} | {}".format(max_b, [min_e, max_e], min_w))
 
         if best_function is not None:
             return best_function, boundaries
 
         else:
-            print("Calibrate found no valid partition. Try changing your light source")
+            raise ValueError("No partitions of the space found.")
 
     def _sort_corners(self, corners):
         if len(corners) == 2:
@@ -245,8 +236,7 @@ class Board:
         return sorted_corners
 
     def _get_intersections(self, image):
-        """Generate a 19x19 array of (x, y) corresponding to the intersections"""
-        _, _, xstep, ystep = get_board_params(image)
+        _, _, xstep, ystep = self._get_board_params(image)
 
         x_locs = [round((ind * xstep)) for ind in range(19)]
         y_locs = [round((ind * ystep)) for ind in range(19)]
@@ -256,15 +246,11 @@ class Board:
         return intersections
 
     def _get_stone_subimage_boundaries(self, image, intersections):
-        """Partition the board into stone regions by taking
-        plus/minus xstep/2 and ystep/2 from the intersection. Notice
-        that we need to be careful around the image edge because
-        negative indices have meaning.
-
-
-        returns xmin, xmax, ymin, ymax
+        """Partition the board into stone regions.
+        Boundaries are plus/minus xstep/2 and ystep/2 from the intersection.
+        Care is necessary at corners and edges.
         """
-        width, height, xstep, ystep = get_board_params(image)
+        width, height, xstep, ystep = self._get_board_params(image)
         boundaries = [[0 for _ in range(19)] for _ in range(19)]
         for i, row in enumerate(intersections):
             for j, loc in enumerate(row):
@@ -279,7 +265,13 @@ class Board:
                 boundaries[i][j] = xmin, xmax, ymin, ymax
         return boundaries
 
-    def _find_region(self, deciding_value, cutoffs):
+    @staticmethod
+    def _get_board_params(image):
+        height, width, _ = image.shape
+        return width, height, width / 18, height / 18
+    
+    @staticmethod
+    def _find_region(deciding_value, cutoffs):
         min_cutoff, max_cutoff = cutoffs
         if deciding_value < min_cutoff:
             position_state = "black"
@@ -289,22 +281,18 @@ class Board:
             position_state = "empty"
         return position_state
 
+    @staticmethod
+    def _human_readable_numeric(loc):
+        row, col = loc
+        return "{}-{}".format(col + 1, 19 - row)
 
-def get_board_params(image):
-    height, width, _ = image.shape
-    return width, height, width / 18, height / 18
-
-
-def check_bgr_blue(im):
-    return im.mean(axis=0).mean(axis=0)[0]
-
-
-def check_hsv_value(im):
-    return cv2.cvtColor(im, cv2.COLOR_BGR2HSV).mean(axis=0).mean(axis=0)[2]
+    @staticmethod
+    def _human_readable_alpha(loc):
+        row, col = loc
+        alpha = "ABCDEFGHJKLMNOPQRST"
+        return "{}{}".format(alpha[col], 19 - row)
 
 
-def check_bw(im):
-    return cv2.cvtColor(im, cv2.COLOR_BGR2GRAY).mean(axis=0).mean(axis=0)
 
-def check_bgr_and_bw(im):
-    return check_bgr_blue(im) + check_bw(im)
+
+
