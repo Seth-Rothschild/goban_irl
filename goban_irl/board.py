@@ -82,16 +82,15 @@ class Board:
 
         self.state = [["empty" for _ in range(19)] for _ in range(19)]
 
-        for i, row in enumerate(stone_subimage_boundaries):
-            for j, boundary in enumerate(row):
-                stone_subimage = utils.crop(board_subimage, boundary)
-                position_state, deciding_value = self.detect_stone(
-                    stone_subimage,
-                    detection_function=detection_function,
-                    cutoffs=cutoffs,
-                )
+        for (i, j), boundary in self._iterate(stone_subimage_boundaries):
+            stone_subimage = utils.crop(board_subimage, boundary)
+            position_state, deciding_value = self.detect_stone(
+                stone_subimage,
+                detection_function=detection_function,
+                cutoffs=cutoffs,
+            )
 
-                self.state[i][j] = position_state
+            self.state[i][j] = position_state
 
         return self.state
 
@@ -119,20 +118,24 @@ class Board:
 
     def compare_to(self, other_board):
         """Compare this board state with another board
+
+        Args:
+            other_board (Board): Another board object with which to compare this one
+
         returns:
-            missing_stones (list(tuple(int, int))): Indices where board2 is missing stones of board1
+            missing_stones (list(tuple(int, int))): Indices where other_board is missing stones of this board
         """
         board_state = self.state
 
         missing_stones = []
-        for i, row in enumerate(board_state):
-            for j, board_value in enumerate(row):
-                other_board_value = other_board.state[i][j]
 
-                if board_value == "empty" and (
-                    other_value == "black" or other_value == "white"
-                ):
-                    missing_stones.append((i, j))
+        for (i, j), board_value in self._iterate(board_state):
+            other_board_value = other_board.state[i][j]
+
+            if board_value == "empty" and (
+                other_board_value == "black" or other_board_value == "white"
+            ):
+                missing_stones.append((i, j))
         return missing_stones
 
     def calibrate(self, black_stones=None, white_stones=None, empty_spaces=None):
@@ -171,7 +174,12 @@ class Board:
             for i, j in empty_spaces
         ]
 
-        test_functions = [utils.check_bgr_blue, utils.check_hsv_value, utils.check_bw, utils.check_bgr_and_bw]
+        test_functions = [
+            utils.check_bgr_blue,
+            utils.check_hsv_value,
+            utils.check_bw,
+            utils.check_bgr_and_bw,
+        ]
         for measurement_function in test_functions:
             b_measurements = [measurement_function(im) for im in black_stone_images]
             e_measurements = [measurement_function(im) for im in empty_space_images]
@@ -252,24 +260,29 @@ class Board:
         """
         width, height, xstep, ystep = self._get_board_params(image)
         boundaries = [[0 for _ in range(19)] for _ in range(19)]
-        for i, row in enumerate(intersections):
-            for j, loc in enumerate(row):
-                xmin, ymin = (
-                    max(0, int(loc[0] - xstep / 2)),
-                    max(0, int(loc[1] - ystep / 2)),
-                )
-                xmax, ymax = (
-                    int(min(loc[0] + xstep / 2, width)),
-                    int(min(loc[1] + ystep / 2, height)),
-                )
-                boundaries[i][j] = xmin, xmax, ymin, ymax
+        for (i, j), loc in self._iterate(intersections):
+            xmin, ymin = (
+                max(0, int(loc[0] - xstep / 2)),
+                max(0, int(loc[1] - ystep / 2)),
+            )
+            xmax, ymax = (
+                int(min(loc[0] + xstep / 2, width)),
+                int(min(loc[1] + ystep / 2, height)),
+            )
+            boundaries[i][j] = xmin, xmax, ymin, ymax
         return boundaries
+
+    @staticmethod
+    def _iterate(two_dim_array):
+        for i, row in enumerate(two_dim_array):
+            for j, value in enumerate(row):
+                yield ((i, j), value)
 
     @staticmethod
     def _get_board_params(image):
         height, width, _ = image.shape
         return width, height, width / 18, height / 18
-    
+
     @staticmethod
     def _find_region(deciding_value, cutoffs):
         min_cutoff, max_cutoff = cutoffs
@@ -291,8 +304,6 @@ class Board:
         row, col = loc
         alpha = "ABCDEFGHJKLMNOPQRST"
         return "{}{}".format(alpha[col], 19 - row)
-
-
 
 
 
