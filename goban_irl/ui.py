@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 
 from goban_irl.board import Board
-from goban_irl.utilities import check_bgr_and_bw
+from goban_irl.utilities import check_bgr_and_bw, show_stones, show_intersections
 
 
 def _boxify(string):
@@ -65,10 +65,10 @@ def _print_loaded_boards(boards_metadata):
         loaded_boards_message += "You have not created any boards yet."
     else:
         for i, board in enumerate(boards_metadata):
-            loaded_boards_message += "Board {}:\n   loader = {},\n    corners = {},\n    boundaries = {}\n\n".format(
+            loaded_boards_message += "Board {}:\n    loader = {},\n    corners = {},\n    boundaries = {}\n\n".format(
                 i, board["loader_type"], board["corners"], board["cutoffs"]
             )
-
+    print(loaded_boards_message)
 
 def _print_describe_missing(board, missing_stones, board_name):
     if len(missing_stones) > 0:
@@ -86,7 +86,9 @@ def _print_describe_missing(board, missing_stones, board_name):
                 )
 
 
-def _prompt_handler(prompt, true_options, false_options):
+def _prompt_handler(prompt):
+    true_options = ["y", "Y", "yes", "Yes", ""]
+    false_options = ["n", "N", "no", "No"]
     response = input("{}: ".format(prompt))
     if response in true_options:
         return True
@@ -94,7 +96,7 @@ def _prompt_handler(prompt, true_options, false_options):
         return False
     else:
         print("Please input either {} or {}".format(true_options[0], false_options[0]))
-        prompt_handler(prompt, true_options, false_options)
+        _prompt_handler(prompt)
 
 
 def _click(board, missing_stone_location):
@@ -147,6 +149,16 @@ def load_corners(board_metadata):
     return corners
 
 
+def _show_sample_board(board_metadata):
+    sample_board = _load_board_from_metadata(board_metadata)
+    show_intersections(sample_board.board_subimage, sample_board.intersections)
+    show_stones(
+        sample_board.board_subimage,
+        sample_board.stone_subimage_boundaries,
+        sample_board.state,
+    )
+
+
 def run_app(verbose=False):
     t0 = time.time()
     _print_welcome_message()
@@ -156,8 +168,6 @@ def run_app(verbose=False):
     if virtual_exists:
         use_virtual = _prompt_handler(
             "Do you want to use the existing virtual board?",
-            ["y", "Y", "yes", ""],
-            ["n", "N", "no"],
         )
 
     if virtual_exists and use_virtual:
@@ -172,13 +182,21 @@ def run_app(verbose=False):
         with open("virtual.json", "w") as f:
             json.dump(virtual_board_metadata, f)
 
+    if verbose:
+        _show_sample_board(virtual_board_metadata)
+
+        looks_ok = _prompt_handler(
+            "Did the previous two images look correct? If not, we'll exit so you can start over.",
+        )
+
+        if not looks_ok:
+            raise ValueError("Board looks off, exiting to start over!")
+
     physical_exists = os.path.exists("physical.json")
     use_physical = False
     if physical_exists:
         use_physical = _prompt_handler(
             "Do you want to use the existing physical board?",
-            ["y", "Y", "yes", ""],
-            ["n", "N", "no"],
         )
     if physical_exists and use_physical:
         with open("physical.json") as f:
@@ -193,8 +211,19 @@ def run_app(verbose=False):
         with open("physical.json", "w") as f:
             json.dump(physical_board_metadata, f)
 
+        if verbose:
+            _show_sample_board(virtual_board_metadata)
+
+            looks_ok = _prompt_handler(
+                "Did the previous two images look correct? If not, we'll exit so you can start over.",
+            )
+
+            if not looks_ok:
+                raise ValueError("Board looks off, exiting to start over!")
+
     _print_loaded_boards([virtual_board_metadata, physical_board_metadata])
 
+    _initial_click(virtual_board_metadata)
     while True:
         virtual_board = _load_board_from_metadata(virtual_board_metadata)
         physical_board = _load_board_from_metadata(physical_board_metadata)
@@ -213,6 +242,10 @@ def run_app(verbose=False):
         if len(missing_stones_on_virtual) == 1 and len(missing_stones_on_physical) == 0:
             _click(virtual_board, missing_stone_location)
 
+
+def _initial_click(board_metadata):
+    board = _load_board_from_metadata(board_metadata)
+    pyautogui.click(board.corners[1][0] // 2, board.corners[1][1] // 2)
 
 def get_corners(img):
     title = "corners"
@@ -249,9 +282,13 @@ def calibrate(board_metadata):
         for x in set(list(itertools.combinations(list(range(19)) + list(range(19)), 2)))
         if ((x not in white_stones) and (x not in black_stones))
     ]
-    return board.calibrate(
+    detection_function, cutoffs = board.calibrate(
         black_stones=black_stones, white_stones=white_stones, empty_spaces=empty_spaces
     )
+    if detection_function is None:
+        raise ValueError("Calibration failed, exiting.")
+
+    return detection_function, cutoffs
 
 
 class ImageLoader:
@@ -275,4 +312,4 @@ class ImageLoader:
 
 
 if __name__ == "__main__":
-    run_app()
+    run_app(verbose=True)

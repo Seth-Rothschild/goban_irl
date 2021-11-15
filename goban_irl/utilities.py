@@ -57,3 +57,31 @@ def check_bgr_and_bw(im):
 
 def import_image(path):
     return cv2.imread(path)
+
+def show_intersections(board_subimage, intersections):
+    img = board_subimage
+    for row in intersections:
+        for loc in row:
+            img = cv2.circle(img, loc, 10, (255, 0, 0))
+    cv2.imshow("Proposed intersections", img)
+    cv2.waitKey(0)
+    destroy_all_windows()
+
+def show_stones(board_subimage, stone_boundaries, state):
+    img = board_subimage
+    for i, row in enumerate(stone_boundaries):
+        for j, (xmin, xmax, ymin, ymax) in enumerate(row):
+            if state[i][j] == 'black':
+                img = cv2.rectangle(img, (xmin, ymin), (xmax, ymax), (0, 0, 0), -1)
+            elif state[i][j] == 'white':
+                img = cv2.rectangle(img, (xmin, ymin), (xmax, ymax), (255, 255, 255), -1)
+            else:
+                continue
+    cv2.imshow("Stones detected", img)
+    cv2.waitKey(0)
+    destroy_all_windows()
+
+def destroy_all_windows():
+    cv2.waitKey(1)
+    cv2.destroyAllWindows()
+    cv2.waitKey(1)
