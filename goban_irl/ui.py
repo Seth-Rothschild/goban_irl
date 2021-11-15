@@ -163,27 +163,27 @@ def run_app(verbose=False):
     t0 = time.time()
     _print_welcome_message()
 
-    virtual_exists = os.path.exists("virtual.json")
-    use_virtual = False
-    if virtual_exists:
-        use_virtual = _prompt_handler(
+    first_board_exists = os.path.exists("virtual.json")
+    use_existing_first_board = False
+    if first_board_exists:
+        use_existing_first_board = _prompt_handler(
             "Do you want to use the existing virtual board?",
         )
 
-    if virtual_exists and use_virtual:
+    if first_board_exists and use_existing_first_board:
         with open("virtual.json") as f:
-            virtual_board_metadata = json.load(f)
+            first_board_metadata = json.load(f)
     else:
-        virtual_board_metadata = {"loader_type": "virtual"}
-        virtual_board_metadata["corners"] = load_corners(virtual_board_metadata)
+        first_board_metadata = {"loader_type": "virtual"}
+        first_board_metadata["corners"] = load_corners(first_board_metadata)
 
-        virtual_board_metadata["cutoffs"] = (204, 316)
-        virtual_board_metadata["flip"] = False
+        first_board_metadata["cutoffs"] = (204, 316)
+        first_board_metadata["flip"] = False
         with open("virtual.json", "w") as f:
-            json.dump(virtual_board_metadata, f)
+            json.dump(first_board_metadata, f)
 
     if verbose:
-        _show_sample_board(virtual_board_metadata)
+        _show_sample_board(first_board_metadata)
 
         looks_ok = _prompt_handler(
             "Did the previous two images look correct? If not, we'll exit so you can start over.",
@@ -192,55 +192,55 @@ def run_app(verbose=False):
         if not looks_ok:
             raise ValueError("Board looks off, exiting to start over!")
 
-    physical_exists = os.path.exists("physical.json")
-    use_physical = False
-    if physical_exists:
-        use_physical = _prompt_handler(
+    second_board_exists = os.path.exists("physical.json")
+    use_existing_second_board = False
+    if second_board_exists:
+        use_existing_second_board = _prompt_handler(
             "Do you want to use the existing physical board?",
         )
-    if physical_exists and use_physical:
+    if second_board_exists and use_existing_second_board:
         with open("physical.json") as f:
-            physical_board_metadata = json.load(f)
+            second_board_metadata = json.load(f)
 
     else:
-        physical_board_metadata = {"loader_type": "physical"}
-        physical_board_metadata["corners"] = load_corners(physical_board_metadata)
-        _, cutoffs = calibrate(physical_board_metadata)
-        physical_board_metadata["cutoffs"] = cutoffs
-        physical_board_metadata["flip"] = True
+        second_board_metadata = {"loader_type": "physical"}
+        second_board_metadata["corners"] = load_corners(second_board_metadata)
+        _, cutoffs = calibrate(second_board_metadata)
+        second_board_metadata["cutoffs"] = cutoffs
+        second_board_metadata["flip"] = True
         with open("physical.json", "w") as f:
-            json.dump(physical_board_metadata, f)
+            json.dump(second_board_metadata, f)
 
-        if verbose:
-            _show_sample_board(virtual_board_metadata)
+    if verbose:
+        _show_sample_board(second_board_metadata)
 
-            looks_ok = _prompt_handler(
-                "Did the previous two images look correct? If not, we'll exit so you can start over.",
-            )
+        looks_ok = _prompt_handler(
+            "Did the previous two images look correct? If not, we'll exit so you can start over.",
+        )
 
-            if not looks_ok:
-                raise ValueError("Board looks off, exiting to start over!")
+        if not looks_ok:
+            raise ValueError("Board looks off, exiting to start over!")
 
-    _print_loaded_boards([virtual_board_metadata, physical_board_metadata])
+    _print_loaded_boards([first_board_metadata, second_board_metadata])
 
-    _initial_click(virtual_board_metadata)
+    _initial_click(first_board_metadata)
     while True:
-        virtual_board = _load_board_from_metadata(virtual_board_metadata)
-        physical_board = _load_board_from_metadata(physical_board_metadata)
+        first_board = _load_board_from_metadata(first_board_metadata)
+        second_board = _load_board_from_metadata(second_board_metadata)
 
-        missing_stones_on_virtual = virtual_board.compare_to(physical_board)
-        missing_stones_on_physical = physical_board.compare_to(virtual_board)
+        first_board_missing_stones = first_board.compare_to(second_board)
+        second_board_missing_stones = second_board.compare_to(first_board)
 
         if verbose:
             _print_describe_missing(
-                virtual_board, missing_stones_on_physical, "Physical board"
+                first_board, second_board_missing_stones, "Physical board"
             )
             _print_describe_missing(
-                physical_board, missing_stones_on_virtual, "Virtual board"
+                second_board, first_board_missing_stones, "Virtual board"
             )
 
-        if len(missing_stones_on_virtual) == 1 and len(missing_stones_on_physical) == 0:
-            _click(virtual_board, missing_stone_location)
+        if len(first_board_missing_stones) == 1 and len(second_board_missing_stones) == 0:
+            _click(first_board, missing_stone_location)
 
 
 def _initial_click(board_metadata):
