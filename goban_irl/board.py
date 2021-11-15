@@ -30,14 +30,26 @@ class Board:
 
             self.board_subimage = self.transform_image(image, self.corners)
 
-            self.find_state_from_image(
+            self.intersections = self._get_intersections(self.board_subimage)
+            self.stone_subimage_boundaries = self._get_stone_subimage_boundaries(
+                self.board_subimage, self.intersections
+            )
+
+            self.state = self.find_state(
                 self.board_subimage,
+                self.stone_subimage_boundaries,
                 detection_function=detection_function,
                 cutoffs=cutoffs,
             )
 
             if flip:
                 self.state = [row[::-1] for row in self.state[::-1]]
+
+            if debug:
+                utils.show_intersections(self.board_subimage, self.intersections)
+                utils.show_stones(
+                    self.board_subimage, self.stone_boundaries, self.state
+                )
 
     def transform_image(self, image, corners):
         """Create a rectangular board from an opencv image and corner locations.
@@ -53,7 +65,7 @@ class Board:
 
         """
         if len(corners) == 2:
-            (xmin, ymin), (xmax, ymax) = self.corners
+            (xmin, ymin), (xmax, ymax) = corners
             boundary = (xmin, xmax, ymin, ymax)
             board_subimage = utils.crop(image, boundary)
 
@@ -61,27 +73,26 @@ class Board:
             board_subimage = utils.perspective_transform(image, corners)
         return board_subimage
 
-    def find_state_from_image(
-        self, board_subimage, detection_function=None, cutoffs=None
+    def find_state(
+        self,
+        board_subimage,
+        stone_subimage_boundaries,
+        detection_function=None,
+        cutoffs=None,
     ):
         """Create a 19x19 array `state` filled with `empty`, `black` and `white`
 
         Args:
             board_subimage (opencv image): A rectangular image whose corners are the 1-1 and 19-19 points on the board.
+            board_subimage_boundaries: A 19x19 array that define the corners of the stone subimage
             detection_function (function: opencv image -> int): A function to detect stones from an image
             cutoffs (tuple[int, int]): Boundaries to make decisions for the detection function
 
         returns:
-            self.state: A 19x19 array of `empty`, `black`, and `white` corresponding to the image and detection function
+            state: A 19x19 array of `empty`, `black`, and `white` corresponding to the image and detection function
         """
 
-        self.intersections = self._get_intersections(board_subimage)
-        stone_subimage_boundaries = self._get_stone_subimage_boundaries(
-            board_subimage, self.intersections
-        )
-
-        self.state = [["empty" for _ in range(19)] for _ in range(19)]
-
+        state = [["empty" for _ in range(19)] for _ in range(19)]
         for (i, j), boundary in self._iterate(stone_subimage_boundaries):
             stone_subimage = utils.crop(board_subimage, boundary)
             position_state, deciding_value = self.detect_stone(
@@ -89,13 +100,12 @@ class Board:
                 detection_function=detection_function,
                 cutoffs=cutoffs,
             )
+            state[i][j] = position_state
 
-            self.state[i][j] = position_state
-
-        return self.state
+        return state
 
     def detect_stone(self, stone_subimage, detection_function=None, cutoffs=None):
-        """Run various stone detection functions based on a stone subimage
+        """Run detection functions based on a stone subimage
 
         Args:
             stone_subimage (opencv image): Maximal image around a stone.
@@ -138,7 +148,9 @@ class Board:
                 missing_stones.append((i, j))
         return missing_stones
 
-    def calibrate(self, black_stones=None, white_stones=None, empty_spaces=None):
+    def calibrate(
+        self, black_stones=None, white_stones=None, empty_spaces=None, verbose=False
+    ):
         """Runs several detection functions to see if they can distinguish
         between white stones, black stones, and empty spaces.
 
@@ -197,19 +209,23 @@ class Board:
             boundaries = None
 
             if (max_b < min_e) and (max_e < min_w):
-                print(
-                    "{} partitions with gaps of size {} and {}".format(
-                        measurement_function.__name__, min_e - max_b, min_w - max_e
+                if verbose:
+                    print(
+                        "{} partitions with gaps of size {} and {}".format(
+                            measurement_function.__name__, min_e - max_b, min_w - max_e
+                        )
                     )
-                )
                 if score > max_score:
                     max_score = score
                     best_function = measurement_function
                     boundaries = ((max_b + min_e) // 2, (max_e + min_w) // 2)
 
             else:
-                print("{} does not partition".format(measurement_function.__name__))
-            print("{} | {} | {}".format(max_b, [min_e, max_e], min_w))
+                if verbose:
+                    print("{} does not partition".format(measurement_function.__name__))
+
+            if verbose:
+                print("{} | {} | {}".format(max_b, [min_e, max_e], min_w))
 
         if best_function is not None:
             return best_function, boundaries
@@ -304,6 +320,3 @@ class Board:
         row, col = loc
         alpha = "ABCDEFGHJKLMNOPQRST"
         return "{}{}".format(alpha[col], 19 - row)
-
-
-
