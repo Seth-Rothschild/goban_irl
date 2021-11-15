@@ -1,19 +1,18 @@
 * About
-The purpose of this package is to be able to play computer go games from a real go board.
+The purpose of this package is to be able to play go online from a physical go board at home.
 
-Unlike the many other repositories which can read go board images, this one is /really dumb/. We assume the user has decent image quality and lighting and is taking the picture from directly in front of the board. We also require the user to input the corners of the board.
+Unlike the many other repositories which can read go board images, this one is /really dumb/. See the *Developer* instructions below for how the code could be modified.
 
-The upshot of that is that the code is easy to read and modify and the algorithm is very quick.
-
-** Feature requests
-Unfortunately I'm not in a place where I can take suggestions for features or review pull requests. I would highly encourage forking this code and modifying it to suit your needs as this suits mine!
+* Maintenance warning
+Unfortunately I'm not in a place where I can take suggestions for features or review pull requests. However, the code here should be pretty readable, even for a novice Python programmer. If you have some functionality you'd like to see implemented or are fighting with a bug here, definitely feel free to fork this code and if you message me directly with questions I'll try to get back to you.
 
 
 * Developer instructions
-We recommend using [[https://github.com/conda-forge/miniforge][miniforge]] for managing your python environments. You can create an environment for this package with
+** Install
+I enjoy using [[https://github.com/conda-forge/miniforge][miniforge]] for managing Python environments. You can install it from that link, and then create a virtual environment as follows:
 
 #+BEGIN_SRC 
-  conda create -n goban_irl python=3.9
+  conda create -n goban_irl --file requirements.txt
 #+END_SRC
 
 After you ~conda activate goban_irl~, you can install the package locally in editable mode with
@@ -22,4 +21,27 @@ After you ~conda activate goban_irl~, you can install the package locally in edi
   python -m pip install -e .
 #+END_SRC
 
+** Code Map
+The key functionality of this code can be found in the ~Board~ class in [[goban_irl/board.py][board.py]]. The ~Board~ class expects two arguments:
+
+  1. an ~image~ which can either be an OpenCV image or a path
+  2. ~corners~, which should be a list of either two or four ~(x,y)~ pixel locations in that image. 
+
+The corners are used to create a ~board_subimage~, a rectangle whose corners are exactly the playable corners of the go board. From there, the rest is easy
+
+  + The ~intersections~ are just 19x19 evenly spaced points in that ~board_subimage~
+  + The ~stone_subimage_boundary~ is the rectangle around each possible stone on that board
+  + The ~detection_function~  takes in a stone subimage and returns a number. If the number is low we'll call the stone black, high we'll call it white, and anything in between should be the empty board. The cutoffs what we call black and white stones are named ~cutoffs~
+
+So, to use this code, you just need to repeatedly load a ~Board~ with your image as it changes. An example of this can be found in [[goban_irl/ui.py][ui.py]] which loads in a physical board, a virtual board, and looks for what stones are missing on the virtual board.
+
+
+** Some useful things
+The main important design decision here is to not care about the rules of Go beyond where stones should be placed. 
+
+I'm also very happy that this only looks at screenshots of computer Go boards. While it would have been possible to interface with the API for various different projects, it's much easier to just look at a picture of the board and know what the color cutoffs for the stones should be. As a result, this code works with Sabaki, OGS, KGS, and probably any other virtual go resource.
+
+I'm not thrilled with the decision here to use OpenCV. It's much heavier as an import than what is needed here, and it's not pleasant to use as a Python package. I couldn't find an easy way to not use it, but I'd be happy to take any recommendations for a way to replace it. Notably, version ~4.5.3~ was entirely broken for me hence the pinned version at ~4.5.2~.
+
+  
 

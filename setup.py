@@ -3,12 +3,6 @@ import io
 import os
 
 
-def read(filename):
-    filepath = os.path.join(os.path.dirname(__file__), filename)
-    with io.open(filepath, mode='r', encoding='utf-8') as f:
-        return f.read().splitlines()
-
-
 setup(
     name='goban_irl',
     packages=find_packages(),
@@ -21,9 +15,7 @@ setup(
     author='Seth Rothschild',
     author_email='seth.j.rothschild@gmail.com',
     description='Read and use goban state from image',
-    install_requires=read('requirements.txt'),
-    tests_require=[
-        'pytest'
-    ],
+    install_requires='pyobjc',
+    tests_require=[],
     test_suite='pytest'
 )

@@ -1,3 +1,5 @@
-pillow
-pyautogui
-pytest
+python=3.9
+opencv=4.5.2 
+pyautogui>=0.9 
+pillow>=8 
+pytest>=6
