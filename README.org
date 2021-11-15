@@ -1,10 +1,10 @@
 * About
 The purpose of this package is to be able to play go online from a physical go board at home.
 
-Unlike the many other repositories which can read go board images, this one is /really dumb/. See the *Developer* instructions below for how the code could be modified.
+Unlike the many other repositories which can read go board images, this one is /really dumb/. See the [[#developer-instructions][developer instructions]] below for how the code could be modified.
 
 * Maintenance warning
-Unfortunately I'm not in a place where I can take suggestions for features or review pull requests. However, the code here should be pretty readable, even for a novice Python programmer. If you have some functionality you'd like to see implemented or are fighting with a bug here, definitely feel free to fork this code and if you message me directly with questions I'll try to get back to you.
+Unfortunately I'm not in a place where I can take suggestions for features or review pull requests. However, the code here should be pretty readable, even for a novice Python programmer. If you have some functionality you'd like to see implemented or are fighting with a bug here, definitely feel free to fork this code. Also, if you message me directly with questions I'll try to get back to you.
 
 
 * Developer instructions
