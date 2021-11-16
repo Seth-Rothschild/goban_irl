@@ -133,6 +133,8 @@ def _load_board_from_metadata(metadata, debug=False):
         debug=debug
     )
 
+def _show_sample_board(board_metadata):
+    sample_board = _load_board_from_metadata(board_metadata, debug=True)
 
 def load_corners(board_metadata):
     loader_type = board_metadata["loader_type"]
@@ -162,16 +164,10 @@ def load_corners(board_metadata):
 
     return corners
 
-
-def _show_sample_board(board_metadata):
-    sample_board = _load_board_from_metadata(board_metadata, debug=True)
-
-
 def run_app(verbose_output=False, show_sample=False):
     _print_welcome_message()
 
     first_board_name = 'first_board.json'
-    second_board_name = 'second_board.json'
 
     first_board_exists = os.path.exists(first_board_name)
     use_existing_first_board = False
@@ -203,6 +199,7 @@ def run_app(verbose_output=False, show_sample=False):
             raise ValueError("Board looks off, exiting to start over!")
 
 
+    second_board_name = 'second_board.json'
     second_board_exists = os.path.exists(second_board_name)
     use_existing_second_board = False
     if second_board_exists:

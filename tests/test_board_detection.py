@@ -132,23 +132,6 @@ def check_stones(board):
             else:
                 assert state == "empty", loc
 
-
-# def test_find_corners_helper():
-#     images = ['tests/image_samples/real_board_3.png']
-#     for path in images:
-#         img = cv2.imread(path)
-
-#         def click(event, x, y, flags, param):
-#             if event == cv2.EVENT_LBUTTONDOWN:
-#                 loc = (x, y)
-#                 print('({}, {}),'.format(x, y))
-
-#         cv2.namedWindow("image")
-#         cv2.setMouseCallback("image", click)
-#         cv2.imshow("image", img)
-#         cv2.waitKey(0)
-#         print('----')
-#     assert False
 def test_calibrate():
     corners = [(888, 1830), (2470, 248)]
     board = Board(image="tests/image_samples/find_stones_test_1.png", corners=corners)
@@ -163,6 +146,21 @@ def test_calibrate():
     corners = [(1105, 548), (2956, 559), (3669, 2305), (455, 2315)]
     board = Board(image="tests/image_samples/real_board_1.png", corners=corners)
     board.calibrate(black_stones=[(18, 18), (3, 15)], white_stones=[(0, 0), (15, 3)], empty_spaces=[(1, 1), (17, 17), (1, 17), (17, 1)])
+
+
+def test_calibrate_edges(capsys):
+    corners = [(888, 1830), (2470, 248)]
+    board = Board(image="tests/image_samples/find_stones_test_1.png", corners=corners)
+    with pytest.raises(ValueError):
+        board.calibrate()
+
+    with pytest.raises(ValueError):
+        board.calibrate(black_stones=[(3, 15)], white_stones=[(0, 0), (15, 3)], empty_spaces=[(1, 1), (17, 17), (1, 17), (18, 18)], verbose=True)
+
+    board.calibrate(black_stones=[(18, 18), (3, 15)], white_stones=[(0, 0), (15, 3)], empty_spaces=[(1, 1), (17, 17), (1, 17), (17, 1)], verbose=True)
+    captured = capsys.readouterr()
+    assert 'check_bgr_and_bw partitions with gaps of size' in captured.out
+        
     
 def test_human_readable():
     board = Board()
@@ -182,6 +180,21 @@ def test_human_readable():
     assert board._human_readable_numeric(loc) == '19-1'
     assert board._human_readable_alpha(loc) == 'T1'
 
+def test_compare_to():
+    corners = [(888, 1830), (2470, 248)]
+    board_1 = Board(image="tests/image_samples/find_stones_test_1.png", corners=corners)    
+    board_2 = Board(image="tests/image_samples/find_stones_test_1.png", corners=corners)
+
+    assert board_1.compare_to(board_2) == []
+    
+    board_1.state[1][1] = 'black'
+
+    assert board_1.compare_to(board_2) == []
+    assert board_2.compare_to(board_1) == [(1, 1)]
+
+    board_2.state[17][17] = 'white'
+    
+    assert board_1.compare_to(board_2) == [(17, 17)]
 
 
     
