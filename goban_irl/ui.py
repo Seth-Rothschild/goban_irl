@@ -167,9 +167,13 @@ def load_corners(board_metadata):
 def run_app(verbose_output=False, show_sample=False):
     _print_welcome_message()
 
-    first_board_name = 'first_board.json'
+    first_board_name = input('Choose a name for your first board: ')
+    if first_board_name == '':
+        first_board_name='first_board'
+    first_board_path = first_board_name + '.json'
+    
+    first_board_exists = os.path.exists(first_board_path)
 
-    first_board_exists = os.path.exists(first_board_name)
     use_existing_first_board = False
     if first_board_exists:
         use_existing_first_board = _prompt_handler(
@@ -177,7 +181,7 @@ def run_app(verbose_output=False, show_sample=False):
         )
 
     if first_board_exists and use_existing_first_board:
-        with open(first_board_name) as f:
+        with open(first_board_path) as f:
             first_board_metadata = json.load(f)
     else:
         first_board_metadata = {"loader_type": "virtual"}
@@ -185,7 +189,7 @@ def run_app(verbose_output=False, show_sample=False):
         first_board_metadata["detection_function"] = 'check_bgr_and_bw'
         first_board_metadata["cutoffs"] = (204, 316)
         first_board_metadata["flip"] = False
-        with open(first_board_name, "w") as f:
+        with open(first_board_path, "w") as f:
             json.dump(first_board_metadata, f)
 
     if show_sample:
@@ -198,16 +202,18 @@ def run_app(verbose_output=False, show_sample=False):
         if not looks_ok:
             raise ValueError("Board looks off, exiting to start over!")
 
-
-    second_board_name = 'second_board.json'
-    second_board_exists = os.path.exists(second_board_name)
+    second_board_name = input('Choose a name for your second board: ')
+    if second_board_name == '':
+        second_board_name = 'second_board'
+    second_board_path = second_board_name + '.json'
+    second_board_exists = os.path.exists(second_board_path)
     use_existing_second_board = False
     if second_board_exists:
         use_existing_second_board = _prompt_handler(
             "Do you want to use the existing second board?",
         )
     if second_board_exists and use_existing_second_board:
-        with open(second_board_name) as f:
+        with open(second_board_path) as f:
             second_board_metadata = json.load(f)
     else:
         if _prompt_handler('Is this a physical board?'):
@@ -228,8 +234,9 @@ def run_app(verbose_output=False, show_sample=False):
         
         second_board_metadata["detection_function"] = detection_function.__name__
         second_board_metadata["cutoffs"] = cutoffs
-        second_board_metadata["flip"] = False
-        with open(second_board_name, "w") as f:
+        second_board_metadata["flip"] = flip
+
+        with open(second_board_path, "w") as f:
             json.dump(second_board_metadata, f)
 
     if show_sample:
@@ -253,10 +260,10 @@ def run_app(verbose_output=False, show_sample=False):
 
         if verbose_output:
             _print_describe_missing(
-                first_board, second_board_missing_stones, "Second board"
+                first_board, second_board_missing_stones, second_board_name
             )
             _print_describe_missing(
-                second_board, first_board_missing_stones, "First board"
+                second_board, first_board_missing_stones, first_board_name
             )
 
         if (
@@ -281,6 +288,7 @@ def get_corners(img):
     height, width, _ = img.shape
     img = cv2.resize(img, (int(width / 1.5), int(height / 1.5)))
     cv2.imshow(title, img)
+
     cv2.waitKey(10000)
     return [(int(x * 1.5), int(y * 1.5)) for (x, y) in corners]
 
@@ -302,7 +310,7 @@ def calibrate(board_metadata):
         if ((x not in white_stones) and (x not in black_stones))
     ]
     detection_function, cutoffs = board.calibrate(
-        black_stones=black_stones, white_stones=white_stones, empty_spaces=empty_spaces
+        black_stones=black_stones, white_stones=white_stones, empty_spaces=empty_spaces, verbose=True
     )
     if detection_function is None:
         raise ValueError("Calibration failed, exiting.")
@@ -327,9 +335,12 @@ class ImageLoader:
             if not cap.isOpened():
                 raise IOError("Cannot open webcam")
             _, frame = cap.read()
-            print("here")
-            cv2.imshow("camera", frame)
-            cv2.waitKey(1)
+            #height, width, _ = frame.shape
+            #img = cv2.resize(frame, (int(width / 3), int(height / 3)))
+            #cv2.imshow('camera', img)
+            #cv2.waitKey(1)
+
+            
             return frame
 
 
