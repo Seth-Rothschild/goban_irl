@@ -1,7 +1,9 @@
 * About
 The purpose of this package is to be able to play go online from a physical go board at home.
 
-Unlike the many other repositories which can read go board images, this one is /really dumb/. See the [[#developer-instructions][developer instructions]] below for how the code could be modified.
+[[./physical_virtual_demo.gif]]
+
+Unlike the many other repositories which can read go board images, this one is /really dumb/ and /really fast/. See the [[#developer-instructions][developer instructions]] below for how to modify the code to suit your needs.
 
 * Maintenance warning
 Unfortunately I'm not in a place where I can take suggestions for features or review pull requests. However, the code here should be pretty readable, even for a novice Python programmer. If you have some functionality you'd like to see implemented or are fighting with a bug here, definitely feel free to fork this code. Also, if you message me directly with questions I'll try to get back to you.
@@ -36,6 +38,14 @@ The corners are used to create a ~board_subimage~, a rectangle whose corners are
 So, to use this code, you just need to repeatedly load a ~Board~ with your image as it changes. An example of this can be found in [[goban_irl/ui.py][ui.py]] which loads in a physical board, a virtual board, and looks for what stones are missing on the virtual board.
 
 
+** Stuff you might want to modify
+While I run the code through ~python ui.py~, I tolerate its many deficiencies because I wrote it. Instead of using that script directly, I would recommend modifying it to suit your needs. Here are what I expect your pain points to be:
+
+  + The user flow as written expects the user to provide the corners of the board. Detecting those corners automatically should not be hard, particularly for virtual boards.
+  + The stone detection function is very lazy and doesn't take into account ambient light. This means when I play at different times of day, I usually need to re-calibrate the physical board. Different detection functions can be passed as input into the ~Board~ class, so it should be easy to write and insert your own better function.
+  + The code which decides to when automatically click is a bit /enthusiastic/. This might be a problem for you if you plan to play online using this code and you might want to implement some validation (e.g. require that it detect a stone needs to be played more than one cycle in a row).
+
+  
 ** Some useful things
 The main important design decision here is to not care about the rules of Go beyond where stones should be placed. 
 
