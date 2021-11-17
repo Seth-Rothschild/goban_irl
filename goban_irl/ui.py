@@ -112,13 +112,16 @@ def _prompt_handler(prompt):
 
 
 def _click(board, missing_stone_location):
+    start_x, start_y = pyautogui.position()
     i, j = missing_stone_location
     screen_position = board.intersections[i][j]
     topleft = board.corners[0]
     click_location = [
         (screen_position[index] + topleft[index]) // 2 for index in range(2)
     ]
-    pyautogui.click(click_location[0], click_location[1])
+    pyautogui.moveTo(click_location[0], click_location[1])
+    pyautogui.click()
+    pyautogui.moveTo(start_x, start_y)
 
 
 
@@ -177,7 +180,7 @@ def run_app(verbose_output=False, show_sample=False):
     use_existing_first_board = False
     if first_board_exists:
         use_existing_first_board = _prompt_handler(
-            "Do you want to use the existing virtual board?",
+            "Do you want to use the existing board ({})?".format(first_board_name),
         )
 
     if first_board_exists and use_existing_first_board:
@@ -210,7 +213,7 @@ def run_app(verbose_output=False, show_sample=False):
     use_existing_second_board = False
     if second_board_exists:
         use_existing_second_board = _prompt_handler(
-            "Do you want to use the existing second board?",
+            "Do you want to use the existing board ({})?".format(second_board_name),
         )
     if second_board_exists and use_existing_second_board:
         with open(second_board_path) as f:
