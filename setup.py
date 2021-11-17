@@ -6,7 +6,7 @@ import os
 setup(
     name='goban_irl',
     packages=find_packages(),
-    version='0.0.2',
+    version='0.0.3',
     entry_points={
         'console_scripts': [
             'goban_irl = goban_irl.__main__:main'
