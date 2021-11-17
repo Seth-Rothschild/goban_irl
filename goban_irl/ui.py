@@ -12,7 +12,7 @@ from goban_irl.utilities import (
     check_bgr_blue,
     check_hsv_value,
     check_bw,
-    check_bgr_and_bw
+    check_bgr_and_bw,
 )
 
 
@@ -40,9 +40,9 @@ def _print_welcome_message():
     print(welcome_message)
 
 
-def _print_cornerloader_text(board_metadata):
+def _print_cornerloader_text(loader_type):
     cornerloader_text = ""
-    if board_metadata["loader_type"] == "virtual":
+    if loader_type == "virtual":
         cornerloader_text += (
             "\nSelect TWO opposite corners of the board (e.g. (1, 1) and (19, 19).\n"
         )
@@ -53,7 +53,7 @@ def _print_cornerloader_text(board_metadata):
             "Once you've chosen two corners, you can exit the selector with Enter.\n\n"
         )
 
-    elif board_metadata["loader_type"] == "physical":
+    elif loader_type == "physical":
         cornerloader_text += "\nSelect FOUR corners of the board.\n"
         cornerloader_text += (
             "Selected points will appear as red circles once they are clicked.\n"
@@ -111,55 +111,59 @@ def _prompt_handler(prompt):
         _prompt_handler(prompt)
 
 
-def _click(board, missing_stone_location):
+def _click(board, missing_stone_location, screen_scale=2):
     start_x, start_y = pyautogui.position()
     i, j = missing_stone_location
     screen_position = board.intersections[i][j]
     topleft = board.corners[0]
     click_location = [
-        (screen_position[index] + topleft[index]) // 2 for index in range(2)
+        (screen_position[index] + topleft[index]) // screen_scale for index in range(2)
     ]
     pyautogui.moveTo(click_location[0], click_location[1])
     pyautogui.click()
     pyautogui.moveTo(start_x, start_y)
 
 
-
 def _load_board_from_metadata(metadata, debug=False):
     detection_function = _load_detection_function(metadata["detection_function"])
     return Board(
-        image=ImageLoader(metadata["loader_type"]).snapshot(),
+        image=get_snapshot(metadata["loader_type"]),
         corners=metadata["corners"],
         detection_function=detection_function,
         cutoffs=metadata["cutoffs"],
         flip=metadata["flip"],
-        debug=debug
+        debug=debug,
     )
+
 
 def _show_sample_board(board_metadata):
     sample_board = _load_board_from_metadata(board_metadata, debug=True)
 
-def load_corners(board_metadata):
-    loader_type = board_metadata["loader_type"]
-    loader = ImageLoader(loader_type)
 
+def _get_scale():
+    img = pyautogui.screenshot()
+    img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+    height, width, _ = img.shape
+    return height // pyautogui.size().height
+
+
+def load_corners(loader_type):
     if loader_type == "virtual":
         ncorners = 2
     elif loader_type == "physical":
         ncorners = 4
 
-    _print_cornerloader_text(board_metadata)
+    _print_cornerloader_text(loader_type)
     input("Make your board visible on screen and press enter to continue...")
 
     corners = []
-    img = loader.snapshot()
 
     while len(corners) != ncorners:
         cv2.waitKey(1)
         cv2.destroyAllWindows()
         cv2.waitKey(1)
-        img = loader.snapshot()
-        corners = get_corners(img)
+        snapshot = get_snapshot(loader_type)
+        corners = get_corners(snapshot)
 
     cv2.waitKey(1)
     cv2.destroyAllWindows()
@@ -167,92 +171,102 @@ def load_corners(board_metadata):
 
     return corners
 
+
+def _show_boards_list():
+    load_options = [f for f in os.listdir() if f.split(".")[-1] == "json"]
+    if len(load_options) > 0:
+        print("Existing boards:")
+        for i, option in enumerate(load_options):
+            print("    {}: {}".format(i, option))
+        print('')
+    return load_options
+
+
+def _get_board_name(load_options, descriptor='board'):
+    result = input("Choose a name for your {}: ".format(descriptor))
+    if result.isnumeric():
+        index = int(result)
+        board_path = load_options[index]
+        board_name = load_options[index].split(".")[0]
+        make_new_board = False
+
+    elif result in load_options:
+        board_path = result
+        board_name = result.split(".")[0]
+        make_new_board = False
+
+    elif (result + '.json') in load_options:
+        board_name = result
+        board_path = result + ".json"
+        make_new_board = False
+
+    else:
+        print('No board {} found, we can make a new one!\n'.format(result))
+        board_name = result
+        board_path = result + ".json"
+        make_new_board = True
+
+    if not make_new_board:
+        use_existing = _prompt_handler(
+            "Do you want to use the existing board ({})".format(board_name)
+        )
+        make_new_board = not use_existing
+
+    return board_name, board_path, make_new_board
+
+
+def make_board(board_name, board_path):
+    print('Making a new board ({})...'.format(board_name))
+    if _prompt_handler("Is this a virtual board?"):
+        loader_type = "virtual"
+        flip = False
+    else:
+        loader_type = "physical"
+        flip = True
+
+    corners = load_corners(loader_type)
+
+    if _prompt_handler("Would you like to calibrate?"):
+        detection_function, cutoffs = calibrate(second_board_metadata)
+    else:
+        detection_function = check_bgr_and_bw
+        cutoffs = (204, 316)
+
+    board_metadata = {
+        "loader_type": loader_type,
+        "corners": corners,
+        "detection_function": detection_function.__name__,
+        "cutoffs": cutoffs,
+        "flip": flip,
+    }
+
+    with open(board_path, "w") as f:
+        json.dump(board_metadata, f)
+
+    return board_metadata
+
+
 def run_app(verbose_output=False, show_sample=False):
     _print_welcome_message()
 
-    first_board_name = input('Choose a name for your first board: ')
-    if first_board_name == '':
-        first_board_name='first_board'
-    first_board_path = first_board_name + '.json'
-    
-    first_board_exists = os.path.exists(first_board_path)
+    load_options = _show_boards_list()
+    first_board_name, first_board_path, make_new_first_board = _get_board_name(load_options, 'first board')
+    second_board_name, second_board_path, make_new_second_board = _get_board_name(load_options, 'second board')
 
-    use_existing_first_board = False
-    if first_board_exists:
-        use_existing_first_board = _prompt_handler(
-            "Do you want to use the existing board ({})?".format(first_board_name),
-        )
-
-    if first_board_exists and use_existing_first_board:
+    if not make_new_first_board:
         with open(first_board_path) as f:
             first_board_metadata = json.load(f)
     else:
-        first_board_metadata = {"loader_type": "virtual"}
-        first_board_metadata["corners"] = load_corners(first_board_metadata)
-        first_board_metadata["detection_function"] = 'check_bgr_and_bw'
-        first_board_metadata["cutoffs"] = (204, 316)
-        first_board_metadata["flip"] = False
-        with open(first_board_path, "w") as f:
-            json.dump(first_board_metadata, f)
+        first_board_metadata = make_board(first_board_name, first_board_path)
 
-    if show_sample:
-        _show_sample_board(first_board_metadata)
-
-        looks_ok = _prompt_handler(
-            "Did the previous two images look correct? If not, we'll exit so you can start over.",
-        )
-
-        if not looks_ok:
-            raise ValueError("Board looks off, exiting to start over!")
-
-    second_board_name = input('Choose a name for your second board: ')
-    if second_board_name == '':
-        second_board_name = 'second_board'
-    second_board_path = second_board_name + '.json'
-    second_board_exists = os.path.exists(second_board_path)
-    use_existing_second_board = False
-    if second_board_exists:
-        use_existing_second_board = _prompt_handler(
-            "Do you want to use the existing board ({})?".format(second_board_name),
-        )
-    if second_board_exists and use_existing_second_board:
+    if not make_new_second_board:
         with open(second_board_path) as f:
             second_board_metadata = json.load(f)
     else:
-        if _prompt_handler('Is this a physical board?'):
-            loader_type = "physical"
-            flip = True
-        else:
-            loader_type = "virtual"
-            flip = False
-
-        second_board_metadata = {"loader_type": loader_type}
-        second_board_metadata["corners"] = load_corners(second_board_metadata)
-        
-        if _prompt_handler('Would you like to calibrate?'):
-            detection_function, cutoffs = calibrate(second_board_metadata)
-        else:
-            detection_function = check_bgr_and_bw
-            cutoffs = (204, 316)
-        
-        second_board_metadata["detection_function"] = detection_function.__name__
-        second_board_metadata["cutoffs"] = cutoffs
-        second_board_metadata["flip"] = flip
-
-        with open(second_board_path, "w") as f:
-            json.dump(second_board_metadata, f)
-
-    if show_sample:
-        _show_sample_board(second_board_metadata)
-
-        looks_ok = _prompt_handler(
-            "Did the previous two images look correct? If not, we'll exit so you can start over.",
-        )
-
-        if not looks_ok:
-            raise ValueError("Board looks off, exiting to start over!")
+        second_board_metadata = make_board(second_board_name, second_board_path)
 
     _print_loaded_boards([first_board_metadata, second_board_metadata])
+    screen_scale = _get_scale()
 
     while True:
         first_board = _load_board_from_metadata(first_board_metadata)
@@ -269,11 +283,8 @@ def run_app(verbose_output=False, show_sample=False):
                 second_board, first_board_missing_stones, first_board_name
             )
 
-        if (
-            len(first_board_missing_stones) == 1
-        ):
-            _click(first_board, first_board_missing_stones[0])
-        time.sleep(.5)
+        if len(first_board_missing_stones) == 1:
+            _click(first_board, first_board_missing_stones[0], screen_scale=screen_scale)
 
 
 def get_corners(img):
@@ -297,9 +308,9 @@ def get_corners(img):
 
 
 def calibrate(board_metadata):
-    loader = ImageLoader(board_metadata["loader_type"])
+    snapshot = get_snapshot(board_metadata["loader_type"])
     corners = board_metadata["corners"]
-    board = Board(loader.snapshot(), corners)
+    board = Board(snapshot, corners)
 
     input(
         "Place white stones at every corner and black stones inside, and no other stones then press Enter"
@@ -313,7 +324,10 @@ def calibrate(board_metadata):
         if ((x not in white_stones) and (x not in black_stones))
     ]
     detection_function, cutoffs = board.calibrate(
-        black_stones=black_stones, white_stones=white_stones, empty_spaces=empty_spaces, verbose=True
+        black_stones=black_stones,
+        white_stones=white_stones,
+        empty_spaces=empty_spaces,
+        verbose=True,
     )
     if detection_function is None:
         raise ValueError("Calibration failed, exiting.")
@@ -321,31 +335,23 @@ def calibrate(board_metadata):
     return detection_function, cutoffs
 
 
-class ImageLoader:
-    def __init__(self, board_type):
-        self.board_type = board_type
+def get_snapshot(loader_type):
+    if loader_type == "virtual":
+        img = pyautogui.screenshot()
+        img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+        height, width, _ = img.shape
+        return img
 
-    def snapshot(self):
-        if self.board_type == "virtual":
-            img = pyautogui.screenshot()
-            img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
-            height, width, _ = img.shape
-
-            return img
-
-        elif self.board_type == "physical":
-            cap = cv2.VideoCapture(0)
-            if not cap.isOpened():
-                raise IOError("Cannot open webcam")
-            _, frame = cap.read()
-            #height, width, _ = frame.shape
-            #img = cv2.resize(frame, (int(width / 3), int(height / 3)))
-            #cv2.imshow('camera', img)
-            #cv2.waitKey(1)
-
-            
-            return frame
+    elif loader_type == "physical":
+        cap = cv2.VideoCapture(0)
+        if not cap.isOpened():
+            raise IOError("Cannot open webcam")
+        _, frame = cap.read()
+        return frame
 
 
 if __name__ == "__main__":
-    run_app(verbose_output=True, show_sample=False)
+    try:
+        run_app(verbose_output=True, show_sample=False)
+    except KeyboardInterrupt:
+        print('\nExiting, thanks for playing!')
