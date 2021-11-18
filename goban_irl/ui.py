@@ -6,6 +6,7 @@ import time
 import pyautogui
 import cv2
 import numpy as np
+import mss
 
 from goban_irl.board import Board
 from goban_irl.utilities import (
@@ -244,7 +245,7 @@ def make_board(board_name, board_path):
     corners = interactive_get_corners(loader_type)
 
     if _prompt_handler("Would you like to calibrate?"):
-        detection_function, cutoffs = iteractive_calibrate(second_board_metadata)
+        detection_function, cutoffs = interactive_calibrate(second_board_metadata)
     else:
         detection_function = check_bgr_and_bw
         cutoffs = (204, 316)
@@ -293,8 +294,8 @@ def interactive_calibrate(board_metadata):
 
 def get_snapshot(loader_type):
     if loader_type == "virtual":
-        img = pyautogui.screenshot()
-        img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+        with mss.mss() as sct:
+            img = np.array(sct.grab(sct.monitors[1]))
         height, width, _ = img.shape
         return img
 
@@ -359,7 +360,6 @@ def run_app(verbose_output=False, show_sample=False):
                 )
                 if len(first_board_missing_stones) == 0 and len(second_board_missing_stones) == 0:
                     print('Board states match.\n')
-
         if len(first_board_missing_stones) == 1:
             _click(
                 first_board, first_board_missing_stones[0], screen_scale=screen_scale
