@@ -189,12 +189,15 @@ def test_compare_to():
     
     board_1.state[1][1] = 'black'
 
-    assert board_1.compare_to(board_2) == []
-    assert board_2.compare_to(board_1) == [(1, 1)]
+    assert board_1.compare_to(board_2) == [(1, 1, 'black', 'empty')]
+    assert board_2.compare_to(board_1) == [(1, 1, 'empty', 'black')]
 
     board_2.state[17][17] = 'white'
     
-    assert board_1.compare_to(board_2) == [(17, 17)]
+    assert (17, 17, 'empty', 'white') in board_1.compare_to(board_2)
+    assert (17, 17, 'white', 'empty') in board_2.compare_to(board_1)
+
+    assert len(board_2.compare_to(board_1)) == 2
 
 
     

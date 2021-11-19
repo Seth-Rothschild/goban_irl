@@ -198,7 +198,7 @@ class Board:
             other_board (Board): Another board object with which to compare this one.
 
         returns:
-            missing_stones (list(tuple(int, int))): Indices where other_board is missing stones of this board.
+            missing_stones (list(i, j, board_value, other_board_value): Position and values of states that do not match.
         """
         board_state = self.state
 
@@ -206,11 +206,8 @@ class Board:
 
         for (i, j), board_value in self._iterate(board_state):
             other_board_value = other_board.state[i][j]
-
-            if board_value == "empty" and (
-                other_board_value == "black" or other_board_value == "white"
-            ):
-                missing_stones.append((i, j))
+            if board_value != other_board_value:
+                missing_stones.append((i, j, board_value, other_board_value))
         return missing_stones
 
     def calibrate(

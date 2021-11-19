@@ -71,15 +71,17 @@ def _print_loaded_boards(boards_metadata):
         loaded_boards_message += "You have not created any boards yet."
     else:
         for i, board in enumerate(boards_metadata):
-            loaded_boards_message += "Board {}:\n    loader = {},\n    corners = {},\n    boundaries = {}\n\n".format(
-                i, board["loader_type"], board["corners"], board["cutoffs"]
-            )
+            loaded_boards_message += "Board {} ({}):\n".format(i+1, board["name"])
+            for key, value in board.items():
+                loaded_boards_message += "    {} = {}\n".format(key, value)
+            loaded_boards_message += "\n"
+
     print(loaded_boards_message)
 
 
-def _print_describe_missing(board, missing_stones, board_name):
+def _print_describe_missing(board, missing_stones):
     if len(missing_stones) > 0:
-        print("{} is missing stones".format(board_name))
+        print("{} is missing stones".format("board"))
         if len(missing_stones) > 5:
             print("    Missing many stones ({})".format(len(missing_stones)))
         else:
@@ -91,7 +93,8 @@ def _print_describe_missing(board, missing_stones, board_name):
                         board._human_readable_numeric((row, col)),
                     )
                 )
-        print('')
+        print("")
+
 
 def _load_detection_function(function_name):
     for function in [check_bgr_blue, check_hsv_value, check_bw, check_bgr_and_bw]:
@@ -142,8 +145,7 @@ def _show_sample_board(board_metadata):
 
 
 def _get_scale():
-    img = pyautogui.screenshot()
-    img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+    img = get_snapshot("virtual")
     height, width, _ = img.shape
     return height // pyautogui.size().height
 
@@ -251,6 +253,7 @@ def make_board(board_name, board_path):
         cutoffs = (204, 316)
 
     board_metadata = {
+        "name": board_name,
         "loader_type": loader_type,
         "corners": corners,
         "detection_function": detection_function.__name__,
@@ -307,16 +310,93 @@ def get_snapshot(loader_type):
         return frame
 
 
-def run_app(verbose_output=False, show_sample=False):
+def _exit_handler(first_board_metadata, second_board_metadata):
+    print(
+        "\nWould you like to (c)ontinue, (l)oad new boards, (f)ast forward, or (e)xit?"
+    )
+    response = input(">> ")
+    if response == "c":
+        watch_boards(first_board_metadata, second_board_metadata)
+
+    elif response == "l":
+        run_app()
+
+    elif response == "f":
+        fast_forward(first_board_metadata, second_board_metadata)
+        watch_boards(first_board_metadata, second_board_metadata)
+
+    else:
+        print("\nExiting, thanks for playing!")
+
+
+def watch_boards(first_board_metadata, second_board_metadata):
+    try:
+        screen_scale = _get_scale()
+        previous_missing_stones = []
+
+        print("Watching boards! Press C-c to quit.")
+        while True:
+            first_board = _load_board_from_metadata(first_board_metadata)
+            second_board = _load_board_from_metadata(second_board_metadata)
+            missing_stones = first_board.compare_to(second_board)
+
+            first_board_missing_stones = [
+                (x[0], x[1]) for x in missing_stones if x[2] == "empty"
+            ]
+            second_board_missing_stones = [
+                (x[0], x[1]) for x in missing_stones if x[3] == "empty"
+            ]
+            if missing_stones != previous_missing_stones:
+                previous_missing_stones = missing_stones
+                _print_describe_missing(first_board, second_board_missing_stones)
+                _print_describe_missing(second_board, first_board_missing_stones)
+                if (
+                    len(first_board_missing_stones) == 0
+                    and len(second_board_missing_stones) == 0
+                ):
+                    print("Board states match.\n")
+            if len(first_board_missing_stones) == 1:
+                _click(
+                    first_board,
+                    first_board_missing_stones[0],
+                    screen_scale=screen_scale,
+                )
+    except KeyboardInterrupt:
+        _exit_handler(first_board_metadata, second_board_metadata)
+
+
+def fast_forward(first_board_metadata, second_board_metadata):
+    screen_scale = _get_scale()
+    first_board = _load_board_from_metadata(first_board_metadata)
+    second_board = _load_board_from_metadata(second_board_metadata)
+    missing_stones = first_board.compare_to(second_board)
+
+    black_stones_to_play = [
+        (x[0], x[1]) for x in missing_stones if (x[2] == "empty" and x[3] == "black")
+    ]
+    white_stones_to_play = [
+        (x[0], x[1]) for x in missing_stones if (x[2] == "empty" and x[3] == "white")
+    ]
+
+    max_stones_to_alternate = min(len(black_stones_to_play), len(white_stones_to_play))
+
+    for i in range(max_stones_to_alternate):
+        _click(first_board, black_stones_to_play[i], screen_scale)
+        _click(first_board, white_stones_to_play[i], screen_scale)
+
+
+def run_app():
     _print_welcome_message()
 
     load_options = _show_boards_list()
     first_board_name, first_board_path, use_existing_first_board = _get_board_name(
         load_options, "first board"
     )
-    second_board_name, second_board_path, use_existing_second_board = _get_board_name(
-        load_options, "second board"
-    )
+    (
+        second_board_name,
+        second_board_path,
+        use_existing_second_board,
+    ) = _get_board_name(load_options, "second board")
 
     if use_existing_first_board:
         with open(first_board_path) as f:
@@ -332,42 +412,8 @@ def run_app(verbose_output=False, show_sample=False):
 
     _print_loaded_boards([first_board_metadata, second_board_metadata])
 
-    screen_scale = _get_scale()
-    previous_missing_stones = [[], []]
-
-    while True:
-        first_board = _load_board_from_metadata(first_board_metadata)
-        second_board = _load_board_from_metadata(second_board_metadata)
-
-        first_board_missing_stones = first_board.compare_to(second_board)
-        second_board_missing_stones = second_board.compare_to(first_board)
-
-        if (
-            first_board_missing_stones != previous_missing_stones[0]
-            or second_board_missing_stones != previous_missing_stones[1]
-        ):
-            previous_missing_stones = [
-                first_board_missing_stones,
-                second_board_missing_stones,
-            ]
-
-            if verbose_output:
-                _print_describe_missing(
-                    first_board, second_board_missing_stones, second_board_name
-                )
-                _print_describe_missing(
-                    second_board, first_board_missing_stones, first_board_name
-                )
-                if len(first_board_missing_stones) == 0 and len(second_board_missing_stones) == 0:
-                    print('Board states match.\n')
-        if len(first_board_missing_stones) == 1:
-            _click(
-                first_board, first_board_missing_stones[0], screen_scale=screen_scale
-            )
+    watch_boards(first_board_metadata, second_board_metadata)
 
 
 if __name__ == "__main__":
-    try:
-        run_app(verbose_output=True, show_sample=False)
-    except KeyboardInterrupt:
-        print("\nExiting, thanks for playing!")
+    run_app()
