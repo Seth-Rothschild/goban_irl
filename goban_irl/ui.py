@@ -170,10 +170,10 @@ def _click(board, missing_stone_location, screen_scale=2):
     pyautogui.moveTo(start_x, start_y)
 
 
-def _load_board_from_metadata(metadata, debug=False):
+def _load_board_from_metadata(metadata, sct=None, debug=False):
     detection_function = _load_detection_function(metadata["detection_function"])
     return Board(
-        image=get_snapshot(metadata["loader_type"]),
+        image=get_snapshot(metadata["loader_type"], sct=sct),
         corners=metadata["corners"],
         detection_function=detection_function,
         cutoffs=metadata["cutoffs"],
@@ -337,9 +337,12 @@ def interactive_calibrate(board_metadata):
     return detection_function, cutoffs
 
 
-def get_snapshot(loader_type):
+def get_snapshot(loader_type, sct=None):
     if loader_type == "virtual":
-        with mss.mss() as sct:
+        if sct == None:
+            with mss.mss() as sct:
+                img = np.array(sct.grab(sct.monitors[1]))
+        else:
             img = np.array(sct.grab(sct.monitors[1]))
         height, width, _ = img.shape
         return img
@@ -412,34 +415,34 @@ def watch_boards(first_board_metadata, second_board_metadata):
 
         up_next = "black"
         previous_mismatched_stones = None
-
-        while True:
-            first_board = _load_board_from_metadata(first_board_metadata)
-            second_board = _load_board_from_metadata(second_board_metadata)
-            mismatched_stones = first_board.compare_to(second_board)
-
-            if previous_mismatched_stones != mismatched_stones:
-                _print_describe_missing(
-                    mismatched_stones,
-                    first_board_metadata["name"],
-                    second_board_metadata["name"],
-                )
-                previous_mismatched_stones = mismatched_stones
-
-            stones_to_play = [
-                (i, j, this_board_stone, other_board_stone)
-                for (i, j, this_board_stone, other_board_stone) in mismatched_stones
-                if (this_board_stone == "empty")
-            ]
-
-            if len(stones_to_play) > 2:
-                continue
-
-            else:
-                up_next = play_stones(
-                    first_board, stones_to_play, up_next, screen_scale
-                )
-
+        with mss.mss() as sct:
+            while True:
+                first_board = _load_board_from_metadata(first_board_metadata, sct=sct)
+                second_board = _load_board_from_metadata(second_board_metadata, sct=sct)
+                mismatched_stones = first_board.compare_to(second_board)
+    
+                if previous_mismatched_stones != mismatched_stones:
+                    _print_describe_missing(
+                        mismatched_stones,
+                        first_board_metadata["name"],
+                        second_board_metadata["name"],
+                    )
+                    previous_mismatched_stones = mismatched_stones
+    
+                stones_to_play = [
+                    (i, j, this_board_stone, other_board_stone)
+                    for (i, j, this_board_stone, other_board_stone) in mismatched_stones
+                    if (this_board_stone == "empty")
+                ]
+    
+                if len(stones_to_play) > 2:
+                    continue
+    
+                else:
+                    up_next = play_stones(
+                        first_board, stones_to_play, up_next, screen_scale
+                    )
+    
     except KeyboardInterrupt:
         _exit_handler(first_board_metadata, second_board_metadata)
 
