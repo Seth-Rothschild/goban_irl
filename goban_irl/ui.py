@@ -23,16 +23,6 @@ def _boxify(string):
     return "+{}+\n|  {}  |\n+{}+\n\n".format(horizontal_line, string, horizontal_line)
 
 
-def _print_missing(board, missing):
-    human_readable_coordinates = []
-    for row, col in missing:
-        human_description = "{} - {}".format(
-            board._human_readable_alpha((row, col)), board.state[row][col]
-        )
-        human_readable_coordinates.append(human_description)
-    return human_readable_coordinates
-
-
 def _print_welcome_message():
     welcome_message = _boxify("Welcome!")
     welcome_message += "This application is an example of how goban_irl\n"
@@ -71,7 +61,7 @@ def _print_loaded_boards(boards_metadata):
         loaded_boards_message += "You have not created any boards yet."
     else:
         for i, board in enumerate(boards_metadata):
-            loaded_boards_message += "Board {} ({}):\n".format(i+1, board["name"])
+            loaded_boards_message += "Board {} ({}):\n".format(i + 1, board["name"])
             for key, value in board.items():
                 loaded_boards_message += "    {} = {}\n".format(key, value)
             loaded_boards_message += "\n"
@@ -79,21 +69,73 @@ def _print_loaded_boards(boards_metadata):
     print(loaded_boards_message)
 
 
-def _print_describe_missing(board, missing_stones):
-    if len(missing_stones) > 0:
-        print("{} is missing stones".format("board"))
-        if len(missing_stones) > 5:
-            print("    Missing many stones ({})".format(len(missing_stones)))
+def _print_describe_missing(
+    mismatched_stones, this_board_name="Board 1", other_board_name="Board 2"
+):
+    if len(mismatched_stones) == 0:
+        print("Board states match!\n")
+        return
+
+    this_board_missing = [x for x in mismatched_stones if x[2] == "empty"]
+    other_board_missing = [x for x in mismatched_stones if x[3] == "empty"]
+    misplay = [x for x in mismatched_stones if (x[2] != "empty") and (x[3] != "empty")]
+    board = Board()
+
+    if len(misplay) > 0:
+        if len(misplay) > 5:
+            print("Warning! There are many mismatched stones ({})".format(len(misplay)))
         else:
-            for (row, col) in missing_stones:
+            print("Warning! There are mismatched stones:")
+            for (i, j, this_stone, other_stone) in misplay:
                 print(
-                    "    Missing {} stone at {} ({})".format(
-                        board.state[row][col],
-                        board._human_readable_alpha((row, col)),
-                        board._human_readable_numeric((row, col)),
+                    "    At {} ({}) {} has {} and {} has {}".format(
+                        board._human_readable_alpha((i, j)),
+                        board._human_readable_numeric((i, j)),
+                        this_board_name,
+                        this_stone,
+                        other_board_name,
+                        other_stone,
                     )
                 )
-        print("")
+        return
+
+    if len(this_board_missing) > 0:
+        if len(this_board_missing) > 5:
+            print(
+                "{} is missing many stones ({})".format(
+                    this_board_name, len(this_board_missing)
+                )
+            )
+        else:
+            print("{} is missing stones:".format(this_board_name))
+            for (i, j, _, other_stone) in this_board_missing:
+                print(
+                    "    Missing {} stone at {} ({})".format(
+                        other_stone,
+                        board._human_readable_alpha((i, j)),
+                        board._human_readable_numeric((i, j)),
+                    )
+                )
+            print("")
+
+    if len(other_board_missing) > 0:
+        if len(other_board_missing) > 5:
+            print(
+                "{} is missing many stones ({})".format(
+                    other_board_name, len(other_board_missing)
+                )
+            )
+        else:
+            print("{} is missing stones:".format(other_board_name))
+            for (i, j, this_stone, _) in other_board_missing:
+                print(
+                    "    Missing {} stone at {} ({})".format(
+                        this_stone,
+                        board._human_readable_alpha((i, j)),
+                        board._human_readable_numeric((i, j)),
+                    )
+                )
+            print("")
 
 
 def _load_detection_function(function_name):
@@ -117,7 +159,7 @@ def _prompt_handler(prompt):
 
 def _click(board, missing_stone_location, screen_scale=2):
     start_x, start_y = pyautogui.position()
-    i, j = missing_stone_location
+    i, j, _, _ = missing_stone_location
     screen_position = board.intersections[i][j]
     topleft = board.corners[0]
     click_location = [
@@ -246,7 +288,7 @@ def make_board(board_name, board_path):
 
     corners = interactive_get_corners(loader_type)
 
-    if _prompt_handler("Would you like to calibrate?"):
+    if loader_type == "physical" and _prompt_handler("Would you like to calibrate?"):
         detection_function, cutoffs = interactive_calibrate(second_board_metadata)
     else:
         detection_function = check_bgr_and_bw
@@ -329,38 +371,75 @@ def _exit_handler(first_board_metadata, second_board_metadata):
         print("\nExiting, thanks for playing!")
 
 
+def play_stones(first_board, stones_to_play, up_next, screen_scale):
+    black_stones_to_play = [
+        (i, j, this_board_stone, other_board_stone)
+        for (i, j, this_board_stone, other_board_stone) in stones_to_play
+        if (this_board_stone == "empty" and other_board_stone == "black")
+    ]
+    white_stones_to_play = [
+        (i, j, this_board_stone, other_board_stone)
+        for (i, j, this_board_stone, other_board_stone) in stones_to_play
+        if (this_board_stone == "empty" and other_board_stone == "white")
+    ]
+
+    if len(black_stones_to_play) == (len(white_stones_to_play) + 1):
+        _click(first_board, black_stones_to_play[-1], screen_scale)
+        up_next = "white"
+
+    elif len(white_stones_to_play) == (len(black_stones_to_play) + 1):
+        _click(first_board, white_stones_to_play[-1], screen_scale)
+        up_next = "black"
+
+    max_stones_to_alternate = min(len(black_stones_to_play), len(white_stones_to_play))
+
+    if up_next == "black":
+        for i in range(max_stones_to_alternate):
+            _click(first_board, black_stones_to_play[i], screen_scale)
+            _click(first_board, white_stones_to_play[i], screen_scale)
+
+    elif up_next == "white":
+        for i in range(max_stones_to_alternate):
+            _click(first_board, white_stones_to_play[i], screen_scale)
+            _click(first_board, black_stones_to_play[i], screen_scale)
+    return up_next
+
+
 def watch_boards(first_board_metadata, second_board_metadata):
     try:
         screen_scale = _get_scale()
-        previous_missing_stones = []
-
         print("Watching boards! Press C-c to quit.")
+
+        up_next = "black"
+        previous_mismatched_stones = None
+
         while True:
             first_board = _load_board_from_metadata(first_board_metadata)
             second_board = _load_board_from_metadata(second_board_metadata)
-            missing_stones = first_board.compare_to(second_board)
+            mismatched_stones = first_board.compare_to(second_board)
 
-            first_board_missing_stones = [
-                (x[0], x[1]) for x in missing_stones if x[2] == "empty"
-            ]
-            second_board_missing_stones = [
-                (x[0], x[1]) for x in missing_stones if x[3] == "empty"
-            ]
-            if missing_stones != previous_missing_stones:
-                previous_missing_stones = missing_stones
-                _print_describe_missing(first_board, second_board_missing_stones)
-                _print_describe_missing(second_board, first_board_missing_stones)
-                if (
-                    len(first_board_missing_stones) == 0
-                    and len(second_board_missing_stones) == 0
-                ):
-                    print("Board states match.\n")
-            if len(first_board_missing_stones) == 1:
-                _click(
-                    first_board,
-                    first_board_missing_stones[0],
-                    screen_scale=screen_scale,
+            if previous_mismatched_stones != mismatched_stones:
+                _print_describe_missing(
+                    mismatched_stones,
+                    first_board_metadata["name"],
+                    second_board_metadata["name"],
                 )
+                previous_mismatched_stones = mismatched_stones
+
+            stones_to_play = [
+                (i, j, this_board_stone, other_board_stone)
+                for (i, j, this_board_stone, other_board_stone) in mismatched_stones
+                if (this_board_stone == "empty")
+            ]
+
+            if len(stones_to_play) > 2:
+                continue
+
+            else:
+                up_next = play_stones(
+                    first_board, stones_to_play, up_next, screen_scale
+                )
+
     except KeyboardInterrupt:
         _exit_handler(first_board_metadata, second_board_metadata)
 
@@ -369,20 +448,15 @@ def fast_forward(first_board_metadata, second_board_metadata):
     screen_scale = _get_scale()
     first_board = _load_board_from_metadata(first_board_metadata)
     second_board = _load_board_from_metadata(second_board_metadata)
-    missing_stones = first_board.compare_to(second_board)
+    mismatched_stones = first_board.compare_to(second_board)
 
-    black_stones_to_play = [
-        (x[0], x[1]) for x in missing_stones if (x[2] == "empty" and x[3] == "black")
+    stones_to_play = [
+        (i, j, this_board_stone, other_board_stone)
+        for (i, j, this_board_stone, other_board_stone) in mismatched_stones
+        if (this_board_stone == "empty")
     ]
-    white_stones_to_play = [
-        (x[0], x[1]) for x in missing_stones if (x[2] == "empty" and x[3] == "white")
-    ]
 
-    max_stones_to_alternate = min(len(black_stones_to_play), len(white_stones_to_play))
-
-    for i in range(max_stones_to_alternate):
-        _click(first_board, black_stones_to_play[i], screen_scale)
-        _click(first_board, white_stones_to_play[i], screen_scale)
+    play_stones(first_board, stones_to_play, "black", screen_scale)
 
 
 def run_app():
