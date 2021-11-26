@@ -305,14 +305,14 @@ def make_board(board_metadata, fix_corners=True, fix_calibration=True):
         corners = interactive_get_corners(loader_type)
 
     if fix_calibration:
-        if _prompt_handler("Would you like to calibrate"):
-            detection_function, cutoffs = interactive_calibrate(corners, loader_type)
-            detection_function = detection_function.__name__
-        else:
-            #detection_function = utils.check_bgr_and_bw.__name__
-            #cutoffs = (204, 316)
+        if _prompt_handler("Would you like to use the default calibration?"):
             detection_function = utils.check_max_difference.__name__
             cutoffs = (650, 750)
+        else:
+
+            detection_function, cutoffs = interactive_calibrate(corners, loader_type)
+            detection_function = detection_function.__name__
+
 
     board_metadata = {
         "name": board_name,
@@ -394,8 +394,9 @@ def get_snapshot(loader_type, sct=None):
 
 
 def _exit_handler(first_board_metadata, second_board_metadata):
+    print('\nBoard Scanning Paused')
     print(
-        "\nWould you like to (c)ontinue, (l)oad new boards, (f)ast forward, or (e)xit?"
+        "Would you like to (c)ontinue, (l)oad new boards, (f)ast forward, or (e)xit?"
     )
     try:
         response = input(">> ")
@@ -427,14 +428,6 @@ def play_stones(first_board, stones_to_play, up_next, screen_scale):
         if (this_board_stone == "empty" and other_board_stone == "white")
     ]
 
-    if len(black_stones_to_play) == (len(white_stones_to_play) + 1):
-        _click(first_board, black_stones_to_play[-1], screen_scale)
-        up_next = "white"
-
-    elif len(white_stones_to_play) == (len(black_stones_to_play) + 1):
-        _click(first_board, white_stones_to_play[-1], screen_scale)
-        up_next = "black"
-
     max_stones_to_alternate = min(len(black_stones_to_play), len(white_stones_to_play))
 
     if up_next == "black":
@@ -446,6 +439,15 @@ def play_stones(first_board, stones_to_play, up_next, screen_scale):
         for i in range(max_stones_to_alternate):
             _click(first_board, white_stones_to_play[i], screen_scale)
             _click(first_board, black_stones_to_play[i], screen_scale)
+
+    if len(black_stones_to_play) == (len(white_stones_to_play) + 1):
+        _click(first_board, black_stones_to_play[-1], screen_scale)
+        up_next = "white"
+
+    elif len(white_stones_to_play) == (len(black_stones_to_play) + 1):
+        _click(first_board, white_stones_to_play[-1], screen_scale)
+        up_next = "black"
+
     return up_next
 
 
@@ -469,12 +471,6 @@ def watch_boards(first_board_metadata, second_board_metadata):
                         second_board_metadata["name"],
                     )
                     stones_ahead = [x for x in mismatched_stones if x[3] == "empty"]
-
-                    if len(stones_ahead) == 1:
-                        i, j, color, _ = stones_ahead[0]
-                        position = (first_board._human_readable_numeric((i, j)),)
-                        os.system("say '{}: {}'".format(color, position))
-
                     previous_mismatched_stones = mismatched_stones
 
                 stones_to_play = [
