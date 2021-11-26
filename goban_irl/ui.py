@@ -9,12 +9,7 @@ import numpy as np
 import mss
 
 from goban_irl.board import Board
-from goban_irl.utilities import (
-    check_bgr_blue,
-    check_hsv_value,
-    check_bw,
-    check_bgr_and_bw,
-)
+import goban_irl.utilities as utils
 
 
 def _boxify(string):
@@ -139,9 +134,21 @@ def _print_describe_missing(
 
 
 def _load_detection_function(function_name):
-    for function in [check_bgr_blue, check_hsv_value, check_bw, check_bgr_and_bw]:
+    for function in [
+        utils.check_bgr_blue,
+        utils.check_hsv_value,
+        utils.check_bw,
+        utils.check_bgr_and_bw,
+        utils.check_bw_subimage,
+        utils.check_max_difference,
+        utils.check_subimage_max_difference,
+        utils.check_bgr_subimage,
+        utils.check_sum
+        
+    ]:
         if function_name == function.__name__:
             return function
+    raise ValueError("Detection function {} not loaded".format(function_name))
 
 
 def _prompt_handler(prompt):
@@ -197,7 +204,7 @@ def _show_boards_list():
     if len(load_options) > 0:
         print("Existing boards:")
         for i, option in enumerate(load_options):
-            print("    {}: {}".format(i, option))
+            print("    {}: {}".format(i+1, option))
         print("")
     return load_options
 
@@ -205,100 +212,114 @@ def _show_boards_list():
 def _get_board_name(load_options, descriptor="board"):
     result = input("Choose a name for your {}: ".format(descriptor))
     if result.isnumeric():
-        index = int(result)
+        index = int(result) - 1
         board_path = load_options[index]
         board_name = load_options[index].split(".")[0]
-        use_existing = True
+        exists = True
 
     elif result in load_options:
         board_path = result
         board_name = result.split(".")[0]
-        use_existing = True
+        exists = True
 
     elif (result + ".json") in load_options:
         board_name = result
         board_path = result + ".json"
-        use_existing = True
+        exists = True
 
     else:
         print("No board {} found, we can make a new one!\n".format(result))
         board_name = result
         board_path = result + ".json"
-        use_existing = False
+        exists = False
 
-    if use_existing:
-        use_existing = _prompt_handler(
-            "Do you want to use the existing board ({})".format(board_name)
-        )
+    return board_name, board_path, exists
 
-    return board_name, board_path, use_existing
+def _get_clicks(img):
+    title = "registering clicks"
+    intersections = []
 
-
-def _get_corners(img):
-    title = "corners"
-    corners = []
-
-    def record_corners(event, x, y, flags, param):
+    def record_click(event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
-            corners.append((x, y))
+            intersections.append((x, y))
             new_img = cv2.circle(img, (x, y), 20, (0, 0, 255), 2)
             cv2.imshow(title, new_img)
 
     cv2.namedWindow(title)
-    cv2.setMouseCallback(title, record_corners)
+    cv2.setMouseCallback(title, record_click)
     height, width, _ = img.shape
     img = cv2.resize(img, (int(width / 1.5), int(height / 1.5)))
     cv2.imshow(title, img)
 
     cv2.waitKey(10000)
-    return [(int(x * 1.5), int(y * 1.5)) for (x, y) in corners]
+    cv2.waitKey(1)
+    cv2.destroyAllWindows()
+    cv2.waitKey(1)
+
+    return [(int(x * 1.5), int(y * 1.5)) for (x, y) in intersections]
 
 
 def interactive_get_corners(loader_type):
     _print_cornerloader_text(loader_type)
 
     if loader_type == "virtual":
-        ncorners = 2
         input("Make your board visible on screen and press enter to continue...")
     elif loader_type == "physical":
-        ncorners = 4
         input(
             "Position your camera to clearly see the board and press enter to continue..."
         )
 
     corners = []
-    while len(corners) != ncorners:
+    while len(set(corners)) != 2 and len(set(corners))!= 4:
         snapshot = get_snapshot(loader_type)
-        corners = _get_corners(snapshot)
+        corners = _get_clicks(snapshot)
         cv2.waitKey(1)
         cv2.destroyAllWindows()
         cv2.waitKey(1)
 
-    return corners
+    return list(set(corners))
 
 
-def make_board(board_name, board_path):
-    print("Making a new board ({})...".format(board_name))
-    if _prompt_handler("Is this a virtual board?"):
-        loader_type = "virtual"
-        flip = False
+def make_board(board_metadata, fix_corners=True, fix_calibration=True):
+    board_name = board_metadata["name"]
+    board_path = board_metadata["path"]
+
+    if len(list(board_metadata.keys())) == 2:
+        print("Making a new board ({})...".format(board_name))
+        if _prompt_handler("Is this a virtual board?"):
+            loader_type = "virtual"
+            flip = False
+        else:
+            loader_type = "physical"
+            flip = True
     else:
-        loader_type = "physical"
-        flip = True
 
-    corners = interactive_get_corners(loader_type)
+        loader_type = board_metadata["loader_type"]
+        flip = board_metadata["flip"]
 
-    if loader_type == "physical" and _prompt_handler("Would you like to calibrate?"):
-        detection_function, cutoffs = interactive_calibrate(second_board_metadata)
-    else:
-        detection_function = check_bgr_and_bw
-        cutoffs = (204, 316)
+        corners = board_metadata["corners"]
+        detection_function = board_metadata["detection_function"]
+        cutoffs = board_metadata["cutoffs"]
+
+    if fix_corners:
+        corners = interactive_get_corners(loader_type)
+
+    if fix_calibration:
+        if _prompt_handler("Would you like to calibrate"):
+            detection_function, cutoffs = interactive_calibrate(corners, loader_type)
+            detection_function = detection_function.__name__
+        else:
+            #detection_function = utils.check_bgr_and_bw.__name__
+            #cutoffs = (204, 316)
+            detection_function = utils.check_max_difference.__name__
+            cutoffs = (650, 750)
 
     board_metadata = {
         "name": board_name,
+        "path": board_path,
         "loader_type": loader_type,
         "corners": corners,
-        "detection_function": detection_function.__name__,
+        "detection_function": detection_function,
         "cutoffs": cutoffs,
         "flip": flip,
     }
@@ -309,28 +330,45 @@ def make_board(board_name, board_path):
     return board_metadata
 
 
-def interactive_calibrate(board_metadata):
-    snapshot = get_snapshot(board_metadata["loader_type"])
-    corners = board_metadata["corners"]
+
+
+
+def _find_nearest_intersection(xstep, ystep, click):
+    return (round(click[1] / ystep), round(click[0] / xstep))
+
+
+def interactive_calibrate(corners, loader_type):
+    snapshot = get_snapshot(loader_type)
     board = Board(snapshot, corners)
 
-    input(
-        "Place white stones at every corner and black stones inside, and no other stones then press Enter"
+    print("Place white stones and black stones on the board.")
+    print(
+        "In the next three screens, click intersections with black stones, then white stones, then empty spaces"
     )
+    input("Press Enter to continue...")
 
-    black_stones = [(17, 17), (1, 1), (1, 17), (17, 1)]
-    white_stones = [(18, 18), (0, 0), (18, 0), (0, 18)]
-    empty_spaces = [
-        x
-        for x in set(list(itertools.combinations(list(range(19)) + list(range(19)), 2)))
-        if ((x not in white_stones) and (x not in black_stones))
+    black_clicks = _get_clicks(board.board_subimage)
+    white_clicks = _get_clicks(board.board_subimage)
+    empty_clicks = _get_clicks(board.board_subimage)
+
+    _, _, xstep, ystep = board._get_board_params(board.board_subimage)
+    black_stones = [
+        _find_nearest_intersection(xstep, ystep, click) for click in black_clicks
     ]
+    white_stones = [
+        _find_nearest_intersection(xstep, ystep, click) for click in white_clicks
+    ]
+    empty_spaces = [
+        _find_nearest_intersection(xstep, ystep, click) for click in empty_clicks
+    ]
+
     detection_function, cutoffs = board.calibrate(
         black_stones=black_stones,
         white_stones=white_stones,
         empty_spaces=empty_spaces,
         verbose=True,
     )
+
     if detection_function is None:
         raise ValueError("Calibration failed, exiting.")
 
@@ -359,18 +397,21 @@ def _exit_handler(first_board_metadata, second_board_metadata):
     print(
         "\nWould you like to (c)ontinue, (l)oad new boards, (f)ast forward, or (e)xit?"
     )
-    response = input(">> ")
-    if response == "c":
-        watch_boards(first_board_metadata, second_board_metadata)
+    try:
+        response = input(">> ")
+        if response == "c":
+            watch_boards(first_board_metadata, second_board_metadata)
 
-    elif response == "l":
-        run_app()
+        elif response == "l":
+            run_app()
 
-    elif response == "f":
-        fast_forward(first_board_metadata, second_board_metadata)
-        watch_boards(first_board_metadata, second_board_metadata)
+        elif response == "f":
+            fast_forward(first_board_metadata, second_board_metadata)
+            watch_boards(first_board_metadata, second_board_metadata)
 
-    else:
+        else:
+            print("\nExiting, thanks for playing!")
+    except KeyboardInterrupt:
         print("\nExiting, thanks for playing!")
 
 
@@ -420,29 +461,36 @@ def watch_boards(first_board_metadata, second_board_metadata):
                 first_board = _load_board_from_metadata(first_board_metadata, sct=sct)
                 second_board = _load_board_from_metadata(second_board_metadata, sct=sct)
                 mismatched_stones = first_board.compare_to(second_board)
-    
+
                 if previous_mismatched_stones != mismatched_stones:
                     _print_describe_missing(
                         mismatched_stones,
                         first_board_metadata["name"],
                         second_board_metadata["name"],
                     )
+                    stones_ahead = [x for x in mismatched_stones if x[3] == "empty"]
+
+                    if len(stones_ahead) == 1:
+                        i, j, color, _ = stones_ahead[0]
+                        position = (first_board._human_readable_numeric((i, j)),)
+                        os.system("say '{}: {}'".format(color, position))
+
                     previous_mismatched_stones = mismatched_stones
-    
+
                 stones_to_play = [
                     (i, j, this_board_stone, other_board_stone)
                     for (i, j, this_board_stone, other_board_stone) in mismatched_stones
                     if (this_board_stone == "empty")
                 ]
-    
+
                 if len(stones_to_play) > 2:
                     continue
-    
+
                 else:
                     up_next = play_stones(
                         first_board, stones_to_play, up_next, screen_scale
                     )
-    
+
     except KeyboardInterrupt:
         _exit_handler(first_board_metadata, second_board_metadata)
 
@@ -462,32 +510,77 @@ def fast_forward(first_board_metadata, second_board_metadata):
     play_stones(first_board, stones_to_play, "black", screen_scale)
 
 
+def _fix_handler(board_metadata):
+    print("Would you like to fix c(o)rners or c(a)libration? [default: (n)ew board]")
+    modify_choice = input(">>")
+
+    fix_corners = False
+    fix_calibration = False
+
+    if modify_choice == "a":
+        fix_calibration = True
+
+    elif modify_choice == "o":
+        fix_corners = True
+
+    else:
+        fix_corners = True
+        fix_calibration = True
+
+    board_metadata = make_board(
+        board_metadata,
+        fix_corners=fix_corners,
+        fix_calibration=fix_calibration,
+    )
+
+    return board_metadata
+
+
 def run_app():
     _print_welcome_message()
 
     load_options = _show_boards_list()
-    first_board_name, first_board_path, use_existing_first_board = _get_board_name(
+    first_board_name, first_board_path, first_board_exists = _get_board_name(
         load_options, "first board"
     )
     (
         second_board_name,
         second_board_path,
-        use_existing_second_board,
+        second_board_exists,
     ) = _get_board_name(load_options, "second board")
 
-    if use_existing_first_board:
+    if first_board_exists:
         with open(first_board_path) as f:
             first_board_metadata = json.load(f)
-    else:
-        first_board_metadata = make_board(first_board_name, first_board_path)
+        _print_loaded_boards([first_board_metadata])
 
-    if use_existing_second_board:
+        use_existing = _prompt_handler(
+            "Would you like to use the existing board ({}) as is".format(
+                first_board_name
+            )
+        )
+        if not use_existing:
+            first_board_metadata = _fix_handler(first_board_metadata)
+    else:
+        first_board_metadata = {"name": first_board_name, "path": first_board_path}
+        first_board_metadata = make_board(first_board_metadata)
+
+    if second_board_exists:
         with open(second_board_path) as f:
             second_board_metadata = json.load(f)
-    else:
-        second_board_metadata = make_board(second_board_name, second_board_path)
+        _print_loaded_boards([second_board_metadata])
+        use_existing = _prompt_handler(
+            "Would you like to use the existing board ({}) as is".format(
+                second_board_name
+            )
+        )
 
-    _print_loaded_boards([first_board_metadata, second_board_metadata])
+        if not use_existing:
+            second_board_metadata = _fix_handler(second_board_metadata)
+
+    else:
+        second_board_metadata = {"name": second_board_name, "path": second_board_path}
+        second_board_metadata = make_board(second_board_metadata)
 
     watch_boards(first_board_metadata, second_board_metadata)
 

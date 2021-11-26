@@ -248,10 +248,26 @@ class Board:
 
         test_functions = [
             utils.check_bgr_blue,
+            utils.check_bgr_subimage,
+
             utils.check_hsv_value,
+
             utils.check_bw,
+            utils.check_bw_subimage,
+
             utils.check_bgr_and_bw,
+
+            utils.check_max_difference,
+            utils.check_subimage_max_difference,
+
+            utils.check_sum,            
         ]
+
+        max_score = 0
+
+        best_function = None
+        boundaries = None
+
         for measurement_function in test_functions:
             b_measurements = [measurement_function(im) for im in black_stone_images]
             e_measurements = [measurement_function(im) for im in empty_space_images]
@@ -263,10 +279,7 @@ class Board:
             min_w = min(w_measurements)
 
             score = min_e - max_b + min_w - max_e
-            max_score = 0
 
-            best_function = None
-            boundaries = None
 
             if (max_b < min_e) and (max_e < min_w):
                 if verbose:
@@ -285,8 +298,9 @@ class Board:
                     print("{} does not partition".format(measurement_function.__name__))
 
             if verbose:
-                print("{} | {} | {}".format(max_b, [min_e, max_e], min_w))
+                print("{} | {} | {}\n".format(max_b, [min_e, max_e], min_w))
 
+        print("")
         if best_function is not None:
             return best_function, boundaries
 

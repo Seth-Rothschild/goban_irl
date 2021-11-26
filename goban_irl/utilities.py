@@ -45,11 +45,45 @@ def check_bgr_blue(im):
 
 
 def check_hsv_value(im):
-    return cv2.cvtColor(im, cv2.COLOR_BGR2HSV).mean(axis=0).mean(axis=0)[2]
+    return cv2.cvtColor(im.copy(), cv2.COLOR_BGR2HSV).mean(axis=0).mean(axis=0)[2]
 
 
 def check_bw(im):
-    return cv2.cvtColor(im, cv2.COLOR_BGR2GRAY).mean(axis=0).mean(axis=0)
+    return cv2.cvtColor(im.copy(), cv2.COLOR_BGR2GRAY).mean(axis=0).mean(axis=0)
+
+def check_bgr_subimage(im):
+    height, width, _ = im.shape
+    im = crop(im.copy(), (2*width//5, 4*width//5, 2*height//5, 4*height//5))
+    return check_bgr_blue(im)
+
+def check_bw_subimage(im):
+    height, width, _ = im.shape
+    im = crop(im.copy(), (2*width//5, 4*width//5, 2*height//5, 4*height//5))
+    return check_bw(im)
+
+def check_subimage_max_difference(im):
+    height, width, _ = im.shape
+    im = crop(im.copy(), (2*width//5, 4*width//5, 2*height//5, 4*height//5))
+    return check_max_difference(im)
+
+
+def check_sum(im):
+    average = im.copy().mean(axis=0).mean(axis=0)
+    return sum(average)
+
+def check_max_difference(im):
+    average = im.mean(axis=0).mean(axis=0)
+    max_difference = max([abs(average[1]-average[0]), abs(average[2]-average[0]), abs(average[1]-average[0])])
+    if max_difference < 70:
+        score = check_sum(im)
+        if score > 700:
+            return 800
+        else:
+            return 600
+    else:
+        return 700
+                                   
+
 
 
 def check_bgr_and_bw(im):
@@ -59,7 +93,7 @@ def import_image(path):
     return cv2.imread(path)
 
 def show_intersections(board_subimage, intersections):
-    img = board_subimage
+    img = board_subimage.copy()
     for row in intersections:
         for loc in row:
             img = cv2.circle(img, loc, 10, (255, 0, 0))
@@ -68,7 +102,7 @@ def show_intersections(board_subimage, intersections):
     destroy_all_windows()
 
 def show_stones(board_subimage, stone_boundaries, state):
-    img = board_subimage
+    img = board_subimage.copy()
     for i, row in enumerate(stone_boundaries):
         for j, (xmin, xmax, ymin, ymax) in enumerate(row):
             if state[i][j] == 'black':
