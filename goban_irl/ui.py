@@ -143,8 +143,7 @@ def _load_detection_function(function_name):
         utils.check_max_difference,
         utils.check_subimage_max_difference,
         utils.check_bgr_subimage,
-        utils.check_sum
-        
+        utils.check_sum,
     ]:
         if function_name == function.__name__:
             return function
@@ -204,7 +203,7 @@ def _show_boards_list():
     if len(load_options) > 0:
         print("Existing boards:")
         for i, option in enumerate(load_options):
-            print("    {}: {}".format(i+1, option))
+            print("    {}: {}".format(i + 1, option))
         print("")
     return load_options
 
@@ -234,6 +233,7 @@ def _get_board_name(load_options, descriptor="board"):
         exists = False
 
     return board_name, board_path, exists
+
 
 def _get_clicks(img):
     title = "registering clicks"
@@ -270,7 +270,7 @@ def interactive_get_corners(loader_type):
         )
 
     corners = []
-    while len(set(corners)) != 2 and len(set(corners))!= 4:
+    while len(set(corners)) != 2 and len(set(corners)) != 4:
         snapshot = get_snapshot(loader_type)
         corners = _get_clicks(snapshot)
         cv2.waitKey(1)
@@ -280,7 +280,7 @@ def interactive_get_corners(loader_type):
     return list(set(corners))
 
 
-def make_board(board_metadata, fix_corners=True, fix_calibration=True):
+def make_board(board_metadata, fix_corners=True, fix_calibration=True, fix_delay=False):
     board_name = board_metadata["name"]
     board_path = board_metadata["path"]
 
@@ -289,13 +289,16 @@ def make_board(board_metadata, fix_corners=True, fix_calibration=True):
         if _prompt_handler("Is this a virtual board?"):
             loader_type = "virtual"
             flip = False
+            delay = 0
         else:
             loader_type = "physical"
             flip = True
+            delay = 2
     else:
 
         loader_type = board_metadata["loader_type"]
         flip = board_metadata["flip"]
+        delay = board_metadata["delay"]
 
         corners = board_metadata["corners"]
         detection_function = board_metadata["detection_function"]
@@ -312,7 +315,12 @@ def make_board(board_metadata, fix_corners=True, fix_calibration=True):
 
             detection_function, cutoffs = interactive_calibrate(corners, loader_type)
             detection_function = detection_function.__name__
-
+    if fix_delay:
+        delay_str = input('What delay would you like (in seconds)? ')
+        if delay_str == '':
+            delay = 0
+        elif delay_str.isnumeric():
+            delay = float(delay_str)
 
     board_metadata = {
         "name": board_name,
@@ -322,15 +330,13 @@ def make_board(board_metadata, fix_corners=True, fix_calibration=True):
         "detection_function": detection_function,
         "cutoffs": cutoffs,
         "flip": flip,
+        "delay": delay
     }
 
     with open(board_path, "w") as f:
         json.dump(board_metadata, f)
 
     return board_metadata
-
-
-
 
 
 def _find_nearest_intersection(xstep, ystep, click):
@@ -394,10 +400,8 @@ def get_snapshot(loader_type, sct=None):
 
 
 def _exit_handler(first_board_metadata, second_board_metadata):
-    print('\nBoard Scanning Paused')
-    print(
-        "Would you like to (c)ontinue, (l)oad new boards, (f)ast forward, or (e)xit?"
-    )
+    print("\nBoard Scanning Paused")
+    print("Would you like to (c)ontinue, (l)oad new boards, (f)ast forward, or (e)xit?")
     try:
         response = input(">> ")
         if response == "c":
@@ -458,6 +462,7 @@ def watch_boards(first_board_metadata, second_board_metadata):
 
         up_next = "black"
         previous_mismatched_stones = None
+        all_pending = []
         with mss.mss() as sct:
             while True:
                 first_board = _load_board_from_metadata(first_board_metadata, sct=sct)
@@ -470,22 +475,47 @@ def watch_boards(first_board_metadata, second_board_metadata):
                         first_board_metadata["name"],
                         second_board_metadata["name"],
                     )
-                    stones_ahead = [x for x in mismatched_stones if x[3] == "empty"]
                     previous_mismatched_stones = mismatched_stones
 
-                stones_to_play = [
+                current_time = time.time()
+
+                first_board_missing_stones = [
                     (i, j, this_board_stone, other_board_stone)
                     for (i, j, this_board_stone, other_board_stone) in mismatched_stones
                     if (this_board_stone == "empty")
                 ]
 
-                if len(stones_to_play) > 2:
+                all_pending_stones = [stone for (stone, _) in all_pending]
+                new_missing_stones = [
+                    (stone, current_time)
+                    for stone in first_board_missing_stones
+                    if (stone not in all_pending_stones)
+                ]
+
+                if len(new_missing_stones) > 2:
                     continue
 
                 else:
-                    up_next = play_stones(
-                        first_board, stones_to_play, up_next, screen_scale
-                    )
+                    all_pending = [
+                        (stone, first_seen)
+                        for (stone, first_seen) in all_pending
+                        if (stone in first_board_missing_stones)
+                    ] + new_missing_stones
+
+                    to_play = [
+                        stone
+                        for (stone, first_seen) in all_pending
+                        if (current_time - first_seen > first_board_metadata["delay"])
+                        and (stone in first_board_missing_stones)
+                    ]
+
+                    all_pending = [
+                        (stone, first_seen)
+                        for (stone, first_seen) in all_pending
+                        if (stone, first_seen) not in to_play
+                    ]
+
+                    up_next = play_stones(first_board, to_play, up_next, screen_scale)
 
     except KeyboardInterrupt:
         _exit_handler(first_board_metadata, second_board_metadata)
@@ -507,26 +537,32 @@ def fast_forward(first_board_metadata, second_board_metadata):
 
 
 def _fix_handler(board_metadata):
-    print("Would you like to fix c(o)rners or c(a)libration? [default: (n)ew board]")
+    print("Would you like to fix\n  c(o)rners,\n  c(a)libration,\n  (d)elay\n  [default: (n)ew board]")
     modify_choice = input(">>")
 
     fix_corners = False
     fix_calibration = False
+    fix_delay = False
 
-    if modify_choice == "a":
+    if "a" in modify_choice:
         fix_calibration = True
 
-    elif modify_choice == "o":
+    if "o" in modify_choice:
         fix_corners = True
 
-    else:
+    if "d" in modify_choice:
+        fix_delay = True
+    
+    if "n" in modify_choice or modify_choice == '':
         fix_corners = True
         fix_calibration = True
+        fix_delay = True
 
     board_metadata = make_board(
         board_metadata,
         fix_corners=fix_corners,
         fix_calibration=fix_calibration,
+        fix_delay=fix_delay
     )
 
     return board_metadata
