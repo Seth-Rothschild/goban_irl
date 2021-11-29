@@ -6,7 +6,7 @@ The purpose of this package is to be able to play go online from a physical go b
 Unlike the many other repositories which can read go board images, this one is /really dumb/ and /really fast/. See the [[#developer-instructions][developer instructions]] below for how to modify the code to suit your needs.
 
 This software can also be used to automatically interface between multiple virtual boards:
-[[./virtual_virtual_demo.gif]]
+[[./ui_example.gif]]
 
 ** Features
 + A `Board()` object in [[goban_irl/board.py][board.py]] which takes in an image and corners of the board on that image and stores what stones are on the board and the positions of the intersections on the board subimage.
