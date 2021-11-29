@@ -344,14 +344,15 @@ def _find_nearest_intersection(xstep, ystep, click):
 
 
 def interactive_calibrate(corners, loader_type):
-    snapshot = get_snapshot(loader_type)
-    board = Board(snapshot, corners)
+
 
     print("Place white stones and black stones on the board.")
     print(
         "In the next three screens, click intersections with black stones, then white stones, then empty spaces"
     )
     input("Press Enter to continue...")
+    snapshot = get_snapshot(loader_type)
+    board = Board(snapshot, corners)
 
     black_clicks = _get_clicks(board.board_subimage)
     white_clicks = _get_clicks(board.board_subimage)
@@ -495,7 +496,7 @@ def watch_boards(first_board_metadata, second_board_metadata):
                 if len(new_missing_stones) > 2:
                     continue
 
-                else:
+                elif len(all_pending_stones) > 0 or len(new_missing_stones) > 0:
                     all_pending = [
                         (stone, first_seen)
                         for (stone, first_seen) in all_pending
@@ -512,9 +513,8 @@ def watch_boards(first_board_metadata, second_board_metadata):
                     all_pending = [
                         (stone, first_seen)
                         for (stone, first_seen) in all_pending
-                        if (stone, first_seen) not in to_play
+                        if stone not in to_play
                     ]
-
                     up_next = play_stones(first_board, to_play, up_next, screen_scale)
 
     except KeyboardInterrupt:

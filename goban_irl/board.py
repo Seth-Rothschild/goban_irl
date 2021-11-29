@@ -272,13 +272,15 @@ class Board:
             b_measurements = [measurement_function(im) for im in black_stone_images]
             e_measurements = [measurement_function(im) for im in empty_space_images]
             w_measurements = [measurement_function(im) for im in white_stone_images]
-
+            
+            min_b = min(b_measurements)
             max_b = max(b_measurements)
             min_e = min(e_measurements)
             max_e = max(e_measurements)
             min_w = min(w_measurements)
+            max_w = max(w_measurements)
 
-            score = min_e - max_b + min_w - max_e
+            score = (min_e - max_b + min_w - max_e)/(max_w - min_b)
 
 
             if (max_b < min_e) and (max_e < min_w):
@@ -302,6 +304,9 @@ class Board:
 
         print("")
         if best_function is not None:
+            if verbose:
+                print("Best function is {}".format(best_function.__name__))
+
             return best_function, boundaries
 
         else:
