@@ -1,4 +1,4 @@
-import goban_irl.utilities as utils
+import goban_irl.opencv_utilities as utils
 
 
 class Board:
@@ -246,22 +246,7 @@ class Board:
             for i, j in empty_spaces
         ]
 
-        test_functions = [
-            utils.check_bgr_blue,
-            utils.check_bgr_subimage,
-
-            utils.check_hsv_value,
-
-            utils.check_bw,
-            utils.check_bw_subimage,
-
-            utils.check_bgr_and_bw,
-
-            utils.check_max_difference,
-            utils.check_subimage_max_difference,
-
-            utils.check_sum,            
-        ]
+        test_functions = utils.DETECTION_FUNCTIONS
 
         max_score = 0
 
@@ -279,8 +264,11 @@ class Board:
             max_e = max(e_measurements)
             min_w = min(w_measurements)
             max_w = max(w_measurements)
-
-            score = (min_e - max_b + min_w - max_e)/(max_w - min_b)
+            
+            if (max_w - min_b) > 0:
+                score = (min_e - max_b + min_w - max_e)/(max_w - min_b)
+            else:
+                score = 0
 
 
             if (max_b < min_e) and (max_e < min_w):

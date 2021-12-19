@@ -1,0 +1,1 @@
+{"name": "sample","path": "sample.json","delay": 0,"loader_type": "virtual","flip": false,"click": true,"corners": [[888, 248], [2470, 1830]],"detection_function": "check_max_difference","cutoffs": [650, 750]}

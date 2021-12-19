@@ -42,7 +42,18 @@ The corners are used to create a ~board_subimage~, a rectangle whose corners are
   + The ~stone_subimage_boundary~ is the rectangle around each possible stone on that board
   + The ~detection_function~  takes in a stone subimage and returns a number. If the number is low we'll call the stone black, high we'll call it white, and anything in between should be the empty board. The cutoffs what we call black and white stones are named ~cutoffs~
 
-So, to use this code, you just need to repeatedly load a ~Board~ with your image as it changes. An example of this can be found in [[goban_irl/ui.py][ui.py]] which loads in a physical board, a virtual board, and looks for what stones are missing on the virtual board.
+So, to use this code, you just need to repeatedly load a ~Board~ with your image as it changes. A simple user interface which compares a physical and virtual board would be as follows:
+
+#+BEGIN_SRC 
+  from goban_irl.board import Board
+  from goban_irl.helpers import get_snapshot
+  while True:
+      board_1 = Board(image=get_snapshot('virtual'), corners=[(0, 0), (800, 800)])
+      board_2 = Board(image=get_snapshot('physical'), corners=[(1437, 679), (2364, 679), (1437, 1617), (2364, 1617)])
+      print(board_1.compare_to(board_2))
+#+END_SRC
+
+A more complex example of this can be found in [[goban_irl/ui.py][ui.py]] which basically does the same thing but with some interactive options.
 
 
 ** Stuff you might want to modify
@@ -50,7 +61,6 @@ While I run the code through ~python ui.py~, I tolerate its many deficiencies be
 
   + The user flow as written expects the user to provide the corners of the board. Detecting those corners automatically should not be hard, particularly for virtual boards.
   + The stone detection function is very lazy and doesn't take into account ambient light. This means when I play at different times of day, I usually need to re-calibrate the physical board. Different detection functions can be passed as input into the ~Board~ class, so it should be easy to write and insert your own better function.
-  + The code which decides to when automatically click is a bit /enthusiastic/. This might be a problem for you if you plan to play online using this code and you might want to implement some validation (e.g. require that it detect a stone needs to be played more than one cycle in a row).
 
   
 ** Some useful things
