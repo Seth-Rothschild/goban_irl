@@ -202,6 +202,6 @@ def get_snapshot(loader_type, sct=None):
         height, width, _ = img.shape
 
     elif loader_type == "physical":
-        img = utils.video_capture()
+        img = video_capture()
 
     return img
