@@ -2,6 +2,7 @@ import cv2
 import mss
 import numpy as np
 
+
 def find_width_and_height(start, end):
     """Given two points (x1, y1), (x2, y2)
     return (|x2-x1|, |y2-y1|)
@@ -174,6 +175,7 @@ def get_clicks(img):
 
     return [(int(x * 1.5), int(y * 1.5)) for (x, y) in intersections]
 
+
 DETECTION_FUNCTIONS = [
     check_bgr_blue,
     check_hsv_value,
@@ -186,15 +188,17 @@ DETECTION_FUNCTIONS = [
     check_bgr_and_bw,
 ]
 
+
 def load_detection_function(function_name):
     for function in DETECTION_FUNCTIONS:
         if function_name == function.__name__:
             return function
     raise ValueError("Detection function {} not loaded".format(function_name))
 
+
 def get_snapshot(loader_type, sct=None):
     if loader_type == "virtual":
-        if sct == None:
+        if sct is None:
             with mss.mss() as sct:
                 img = np.array(sct.grab(sct.monitors[1]))
         else:
@@ -202,6 +206,6 @@ def get_snapshot(loader_type, sct=None):
         height, width, _ = img.shape
 
     elif loader_type == "physical":
-        img = utils.video_capture()
+        img = video_capture()
 
     return img

@@ -3,6 +3,7 @@ import goban_irl.opencv_utilities as utils
 
 from goban_irl.board import Board
 
+
 def boxify(string):
     horizontal_line = (len(string) + 4) * "-"
     return "+{}+\n|  {}  |\n+{}+\n\n".format(horizontal_line, string, horizontal_line)
@@ -48,7 +49,7 @@ def click(board, missing_stone_location, screen_scale=2):
 def print_describe_missing(missing_stones, board_name):
     print("")
     if len(missing_stones) == 0:
-        print('Board {} is not missing any stones'.format(board_name))
+        print("Board {} is not missing any stones".format(board_name))
         return
 
     board = Board()

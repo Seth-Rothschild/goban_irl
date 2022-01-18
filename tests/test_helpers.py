@@ -1,4 +1,3 @@
-import pytest
 import pyautogui
 import goban_irl.helpers as helpers
 import goban_irl.opencv_utilities as utils

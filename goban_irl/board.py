@@ -181,9 +181,9 @@ class Board:
             position_state (str): Either `'black'`, `'empty'`, or `'white'`.
             deciding_value (float): The value used to make the decision.
         """
-        if detection_function == None:
+        if detection_function is None:
             detection_function = utils.check_bgr_blue
-        if cutoffs == None:
+        if cutoffs is None:
             cutoffs = (70, 150)
 
         deciding_value = detection_function(stone_subimage)
@@ -257,19 +257,18 @@ class Board:
             b_measurements = [measurement_function(im) for im in black_stone_images]
             e_measurements = [measurement_function(im) for im in empty_space_images]
             w_measurements = [measurement_function(im) for im in white_stone_images]
-            
+
             min_b = min(b_measurements)
             max_b = max(b_measurements)
             min_e = min(e_measurements)
             max_e = max(e_measurements)
             min_w = min(w_measurements)
             max_w = max(w_measurements)
-            
+
             if (max_w - min_b) > 0:
-                score = (min_e - max_b + min_w - max_e)/(max_w - min_b)
+                score = (min_e - max_b + min_w - max_e) / (max_w - min_b)
             else:
                 score = 0
-
 
             if (max_b < min_e) and (max_e < min_w):
                 if verbose:

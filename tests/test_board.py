@@ -1,10 +1,8 @@
-import random
 import itertools
 
 import pytest
 import cv2
-import numpy as np
-import os
+
 from goban_irl.board import Board
 
 
@@ -33,7 +31,7 @@ def test_transform_image_four_corners():
     corners = [(590, 1328), (2232, 1330), (2669, 3059), (100, 3083)]
     board = Board(image, corners)
 
-    cv2image= cv2.imread(image)
+    cv2image = cv2.imread(image)
     img = board.transform_image(cv2image, corners)
     height, width, _ = img.shape
     assert width == corners[2][0] - corners[3][0]
@@ -132,20 +130,37 @@ def check_stones(board):
             else:
                 assert state == "empty", loc
 
+
 def test_calibrate():
     corners = [(888, 1830), (2470, 248)]
     board = Board(image="tests/image_samples/find_stones_test_1.png", corners=corners)
-    board.calibrate(black_stones=[(18, 18), (3, 15)], white_stones=[(0, 0), (15, 3)], empty_spaces=[(1, 1), (17, 17), (1, 17), (17, 1)])
+    board.calibrate(
+        black_stones=[(18, 18), (3, 15)],
+        white_stones=[(0, 0), (15, 3)],
+        empty_spaces=[(1, 1), (17, 17), (1, 17), (17, 1)],
+    )
 
     board = Board(image="tests/image_samples/find_stones_test_2.png", corners=corners)
-    board.calibrate(black_stones=[(18, 18), (3, 15)], white_stones=[(0, 0), (15, 3)], empty_spaces=[(1, 1), (17, 17), (1, 17), (17, 1)])
+    board.calibrate(
+        black_stones=[(18, 18), (3, 15)],
+        white_stones=[(0, 0), (15, 3)],
+        empty_spaces=[(1, 1), (17, 17), (1, 17), (17, 1)],
+    )
 
     board = Board(image="tests/image_samples/find_stones_test_3.png", corners=corners)
-    board.calibrate(black_stones=[(18, 18), (3, 15)], white_stones=[(0, 0), (15, 3)], empty_spaces=[(1, 1), (17, 17), (1, 17), (17, 1)])
+    board.calibrate(
+        black_stones=[(18, 18), (3, 15)],
+        white_stones=[(0, 0), (15, 3)],
+        empty_spaces=[(1, 1), (17, 17), (1, 17), (17, 1)],
+    )
 
     corners = [(1105, 548), (2956, 559), (3669, 2305), (455, 2315)]
     board = Board(image="tests/image_samples/real_board_1.png", corners=corners)
-    board.calibrate(black_stones=[(18, 18), (3, 15)], white_stones=[(0, 0), (15, 3)], empty_spaces=[(1, 1), (17, 17), (1, 17), (17, 1)])
+    board.calibrate(
+        black_stones=[(18, 18), (3, 15)],
+        white_stones=[(0, 0), (15, 3)],
+        empty_spaces=[(1, 1), (17, 17), (1, 17), (17, 1)],
+    )
 
 
 def test_calibrate_edges(capsys):
@@ -155,49 +170,57 @@ def test_calibrate_edges(capsys):
         board.calibrate()
 
     with pytest.raises(ValueError):
-        board.calibrate(black_stones=[(3, 15)], white_stones=[(0, 0), (15, 3)], empty_spaces=[(1, 1), (17, 17), (1, 17), (18, 18)], verbose=True)
+        board.calibrate(
+            black_stones=[(3, 15)],
+            white_stones=[(0, 0), (15, 3)],
+            empty_spaces=[(1, 1), (17, 17), (1, 17), (18, 18)],
+            verbose=True,
+        )
 
-    board.calibrate(black_stones=[(18, 18), (3, 15)], white_stones=[(0, 0), (15, 3)], empty_spaces=[(1, 1), (17, 17), (1, 17), (17, 1)], verbose=True)
+    board.calibrate(
+        black_stones=[(18, 18), (3, 15)],
+        white_stones=[(0, 0), (15, 3)],
+        empty_spaces=[(1, 1), (17, 17), (1, 17), (17, 1)],
+        verbose=True,
+    )
     captured = capsys.readouterr()
-    assert 'check_bgr_and_bw partitions with gaps of size' in captured.out
-        
-    
+    assert "check_bgr_and_bw partitions with gaps of size" in captured.out
+
+
 def test_human_readable():
     board = Board()
     loc = (0, 0)
-    assert board._human_readable_numeric(loc) == '1-19'
-    assert board._human_readable_alpha(loc) == 'A19'
+    assert board._human_readable_numeric(loc) == "1-19"
+    assert board._human_readable_alpha(loc) == "A19"
 
     loc = (18, 0)
-    assert board._human_readable_numeric(loc) == '1-1'
-    assert board._human_readable_alpha(loc) == 'A1'
+    assert board._human_readable_numeric(loc) == "1-1"
+    assert board._human_readable_alpha(loc) == "A1"
 
     loc = (0, 18)
-    assert board._human_readable_numeric(loc) == '19-19'
-    assert board._human_readable_alpha(loc) == 'T19'
+    assert board._human_readable_numeric(loc) == "19-19"
+    assert board._human_readable_alpha(loc) == "T19"
 
     loc = (18, 18)
-    assert board._human_readable_numeric(loc) == '19-1'
-    assert board._human_readable_alpha(loc) == 'T1'
+    assert board._human_readable_numeric(loc) == "19-1"
+    assert board._human_readable_alpha(loc) == "T1"
+
 
 def test_compare_to():
     corners = [(888, 1830), (2470, 248)]
-    board_1 = Board(image="tests/image_samples/find_stones_test_1.png", corners=corners)    
+    board_1 = Board(image="tests/image_samples/find_stones_test_1.png", corners=corners)
     board_2 = Board(image="tests/image_samples/find_stones_test_1.png", corners=corners)
 
     assert board_1.compare_to(board_2) == []
-    
-    board_1.state[1][1] = 'black'
 
-    assert board_1.compare_to(board_2) == [(1, 1, 'black', 'empty')]
-    assert board_2.compare_to(board_1) == [(1, 1, 'empty', 'black')]
+    board_1.state[1][1] = "black"
 
-    board_2.state[17][17] = 'white'
-    
-    assert (17, 17, 'empty', 'white') in board_1.compare_to(board_2)
-    assert (17, 17, 'white', 'empty') in board_2.compare_to(board_1)
+    assert board_1.compare_to(board_2) == [(1, 1, "black", "empty")]
+    assert board_2.compare_to(board_1) == [(1, 1, "empty", "black")]
+
+    board_2.state[17][17] = "white"
+
+    assert (17, 17, "empty", "white") in board_1.compare_to(board_2)
+    assert (17, 17, "white", "empty") in board_2.compare_to(board_1)
 
     assert len(board_2.compare_to(board_1)) == 2
-
-
-    
