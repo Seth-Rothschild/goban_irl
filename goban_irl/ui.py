@@ -279,7 +279,7 @@ def exit_handler(first_board_metadata, second_board_metadata):
         print("\nExiting, thanks for playing!")
 
 
-def play_stones(first_board, stones_to_play, up_next, screen_scale):
+def play_stones(first_board, stones_to_play, up_next, screen_scale, play_odd=True):
     black_stones_to_play = [
         (i, j, this_board_stone, other_board_stone)
         for (i, j, this_board_stone, other_board_stone) in stones_to_play
@@ -303,13 +303,14 @@ def play_stones(first_board, stones_to_play, up_next, screen_scale):
             click(first_board, white_stones_to_play[i], screen_scale)
             click(first_board, black_stones_to_play[i], screen_scale)
 
-    if len(black_stones_to_play) == (len(white_stones_to_play) + 1):
-        click(first_board, black_stones_to_play[-1], screen_scale)
-        up_next = "white"
+    if play_odd:
+        if len(black_stones_to_play) == (len(white_stones_to_play) + 1):
+            click(first_board, black_stones_to_play[-1], screen_scale)
+            up_next = "white"
 
-    elif len(white_stones_to_play) == (len(black_stones_to_play) + 1):
-        click(first_board, white_stones_to_play[-1], screen_scale)
-        up_next = "black"
+        elif len(white_stones_to_play) == (len(black_stones_to_play) + 1):
+            click(first_board, white_stones_to_play[-1], screen_scale)
+            up_next = "black"
 
     return up_next
 
@@ -326,7 +327,7 @@ def fast_forward(first_board_metadata, second_board_metadata):
         if (this_board_stone == "empty")
     ]
 
-    play_stones(first_board, stones_to_play, "black", screen_scale)
+    play_stones(first_board, stones_to_play, "black", screen_scale, play_odd=False)
 
 
 def evaluate_state(first_board, second_board, all_pending):
